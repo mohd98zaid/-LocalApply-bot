@@ -5,11 +5,11 @@
 // ============================================================
 
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 
 // Configure PDF.js worker
-// In a Chrome Extension, we use the bundled fake worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export interface ParsedText {
   text: string;
