@@ -288,6 +288,50 @@ function AnalyzeTab({ pageAnalysis, ollamaStatus }: { pageAnalysis: PageAnalysis
         </div>
       )}
 
+      {/* Global Job Search (Always visible) */}
+      <div className="glass-card" style={{ padding: '14px' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+          Find & Auto-Apply
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <input 
+            type="text" 
+            className="input" 
+            placeholder="e.g. React Developer" 
+            style={{ width: '100%', marginBottom: '8px', boxSizing: 'border-box' }}
+            id="job-search-input"
+          />
+          <select className="input" style={{ width: '100%', boxSizing: 'border-box' }} id="job-portal-select">
+            <option value="linkedin">LinkedIn</option>
+            <option value="naukri">Naukri</option>
+          </select>
+        </div>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            const keyword = (document.getElementById('job-search-input') as HTMLInputElement).value;
+            const portal = (document.getElementById('job-portal-select') as HTMLSelectElement).value;
+            if (!keyword) return alert('Enter a keyword');
+            
+            let url = '';
+            if (portal === 'linkedin') {
+              url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(keyword)}`;
+            } else if (portal === 'naukri') {
+              url = `https://www.naukri.com/${keyword.replace(/\s+/g, '-')}-jobs`;
+            }
+            
+            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+              if (tab?.id) {
+                chrome.tabs.update(tab.id, { url });
+              }
+            });
+          }}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          🔍 Search & Start Auto-Apply
+        </button>
+      </div>
+
       {/* Analyze button */}
       <button
         className="btn-secondary"
