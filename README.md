@@ -14,6 +14,7 @@
 |---------|--------|
 | 🎯 Job page detection (10 ATS platforms) | ✅ MVP |
 | 📋 Form autofill with profile data | ✅ MVP |
+| 👤 Multiple Profiles & Resumes | ✅ MVP |
 | 🤖 AI-powered Q&A (behavioral, salary, visa...) | ✅ MVP |
 | 📝 AI Cover Letter generation | ✅ MVP |
 | 📊 Match score vs. job description | ✅ MVP |
@@ -174,6 +175,7 @@ npm run lint         # Lint with oxlint
 
 ## 📋 Roadmap
 
+- [x] **v0.2** — Full Profile Management UI
 - [ ] **v0.2** — Resume upload & parsing (PDF/DOCX via Offscreen API)
 - [ ] **v0.2** — Local RAG memory (HNSW vectors in IndexedDB)
 - [ ] **v0.3** — Resume tailoring AI workflow
