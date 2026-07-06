@@ -287,8 +287,8 @@ export class WorkdayAdapter extends BaseATSAdapter {
     const isWorkday = url.includes('myworkdayjobs.com') ||
       !!doc.querySelector('[data-automation-id], .WDFC, [class*="WDHeaderContainer"]');
 
-    const isAppForm = !!doc.querySelector(
-      '[data-automation-id="applicationForm"], [data-automation-id="Application"]'
+    const isAppForm = url.includes('/apply/') || !!doc.querySelector(
+      '[data-automation-id="applicationForm"], [data-automation-id="Application"], [data-automation-id="file-upload-drop-zone"]'
     );
 
     return {
