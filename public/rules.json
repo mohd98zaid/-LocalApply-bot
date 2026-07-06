@@ -10,7 +10,7 @@
     },
     "condition": {
       "urlFilter": "||localhost",
-      "resourceTypes": ["xmlhttprequest", "fetch"]
+      "resourceTypes": ["xmlhttprequest"]
     }
   },
   {
@@ -24,7 +24,7 @@
     },
     "condition": {
       "urlFilter": "||127.0.0.1",
-      "resourceTypes": ["xmlhttprequest", "fetch"]
+      "resourceTypes": ["xmlhttprequest"]
     }
   }
 ]
