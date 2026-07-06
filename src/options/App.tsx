@@ -3,13 +3,14 @@ import type { ExtensionSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
 
 import { ProfileManager } from './ProfileManager';
+import { AutomationDashboard } from './AutomationDashboard';
 
 // ============================================================
 // Options Page App — Settings & Configuration
 // src/options/App.tsx
 // ============================================================
 
-type Section = 'general' | 'ai' | 'profile' | 'data' | 'about';
+type Section = 'general' | 'ai' | 'automation' | 'profile' | 'data' | 'about';
 
 export default function OptionsApp() {
   const [section, setSection] = useState<Section>('general');
@@ -41,6 +42,7 @@ export default function OptionsApp() {
   const navItems: { id: Section; label: string; icon: string }[] = [
     { id: 'general', label: 'General', icon: '⚙️' },
     { id: 'ai', label: 'AI & Ollama', icon: '🤖' },
+    { id: 'automation', label: 'Auto-Apply', icon: '🚀' },
     { id: 'profile', label: 'Profile', icon: '👤' },
     { id: 'data', label: 'Data & Privacy', icon: '🔒' },
     { id: 'about', label: 'About', icon: 'ℹ️' },
@@ -126,9 +128,10 @@ export default function OptionsApp() {
           </div>
         )}
 
-        {section === 'general' && <GeneralSection settings={settings} onSave={saveSettings} isSaving={isSaving} />}
-        {section === 'ai' && <AISection settings={settings} onSave={saveSettings} isSaving={isSaving} />}
-        {section === 'profile' && <ProfileManager />}
+        { section === 'general' && <GeneralSection settings={settings} onSave={saveSettings} isSaving={isSaving} /> }
+        { section === 'ai' && <AISection settings={settings} onSave={saveSettings} isSaving={isSaving} /> }
+        { section === 'automation' && <AutomationDashboard settings={settings} onSave={saveSettings} /> }
+        { section === 'profile' && <ProfileManager /> }
         {section === 'data' && <DataSection settings={settings} onSave={saveSettings} />}
         {section === 'about' && <AboutSection />}
       </div>
