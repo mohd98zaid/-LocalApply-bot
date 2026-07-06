@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "LocalApply — AI Job Application Copilot",
+  "version": "0.1.0",
+  "description": "Open-source, privacy-first AI job application assistant powered by local Ollama. Your data never leaves your computer.",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "sidePanel",
+    "offscreen",
+    "scripting",
+    "tabs"
+  ],
+
+  "optional_permissions": [
+    "notifications"
+  ],
+
+  "host_permissions": [
+    "http://localhost:11434/*",
+    "http://127.0.0.1:11434/*"
+  ],
+
+  "background": {
+    "service_worker": "src/background/serviceWorker.ts",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.linkedin.com/jobs/*",
+        "*://*.indeed.com/*",
+        "*://boards.greenhouse.io/*",
+        "*://*.greenhouse.io/*",
+        "*://jobs.lever.co/*",
+        "*://*.lever.co/*",
+        "*://*.myworkdayjobs.com/*",
+        "*://*.wd5.myworkdayjobs.com/*",
+        "*://*.ashbyhq.com/*",
+        "*://*.bamboohr.com/careers/*",
+        "*://jobs.smartrecruiters.com/*",
+        "*://*.smartrecruiters.com/*",
+        "*://*.jobvite.com/*",
+        "*://wellfound.com/jobs/*",
+        "*://wellfound.com/l/2/*"
+      ],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LocalApply",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+
+  "options_page": "options.html",
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src http://localhost:11434 http://127.0.0.1:11434; object-src 'none'"
+  },
+
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

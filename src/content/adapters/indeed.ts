@@ -1,0 +1,1 @@
+export { IndeedAdapter } from './greenhouse';

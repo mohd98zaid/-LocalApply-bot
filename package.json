@@ -1,0 +1,49 @@
+{
+  "name": "localapply",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source, privacy-first AI job application assistant powered by local Ollama",
+  "author": "LocalApply Contributors",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "lint": "oxlint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "icons": "node scripts/generate-icons.cjs",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@crxjs/vite-plugin": "^2.7.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "idb": "^8.0.3",
+    "mammoth": "^1.12.0",
+    "ollama": "^0.6.3",
+    "pdfjs-dist": "^6.1.200",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.2",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/chrome": "^0.2.2",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.1.10"
+  }
+}
