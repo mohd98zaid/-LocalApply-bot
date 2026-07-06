@@ -59,7 +59,11 @@ export class ATSDetector {
 
     const isApplicationPage = detectionResult.pageType === 'application_form';
     const isJobListingPage = detectionResult.pageType === 'job_listing';
-    const isSearchPage = detectionResult.pageType === 'search_results';
+    
+    // Some pages are both (e.g. LinkedIn split view). We check the URL directly as a fallback.
+    const isSearchPage = detectionResult.pageType === 'search_results' || 
+                         window.location.href.includes('/jobs/search/') || 
+                         window.location.href.includes('-jobs');
 
     let jobDescription = undefined;
     let formFields: FormField[] = [];

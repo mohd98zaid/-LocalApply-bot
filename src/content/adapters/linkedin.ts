@@ -18,24 +18,21 @@ export class LinkedInAdapter extends BaseATSAdapter {
     const isLinkedIn = url.includes('linkedin.com');
     if (!isLinkedIn) return { detected: false, atsName: 'linkedin', confidence: 0, pageType: 'unknown', metadata: {} };
 
-    // Easy Apply modal
-    const hasEasyApply = !!doc.querySelector(
-      '.jobs-easy-apply-content, .jobs-apply-button--top-card, [data-control-name="jobdetails_topcard_inapply"]'
-    );
+    // Easy Apply modal (indicates application form is OPEN)
+    const isAppForm = !!doc.querySelector('.jobs-easy-apply-modal');
+    
     // Search results page
-    const isSearchPage = url.includes('/jobs/search/') && !doc.querySelector('.jobs-easy-apply-modal, .jobs-apply-form');
-    // Job listing
-    const isJobPage = url.includes('/jobs/view/') || (url.includes('/jobs/search/') && hasEasyApply);
-    // Application form
-    const isAppForm = !!doc.querySelector('.jobs-easy-apply-modal, .jobs-apply-form');
+    const isSearchPage = url.includes('/jobs/search/') && !isAppForm;
+    
+    // Job listing (can be /view/ or /search/ with a selected job)
+    const isJobPage = url.includes('/jobs/view/') || (url.includes('/jobs/search/') && !!doc.querySelector('.job-view-layout, .jobs-search__job-details--container, .job-details-jobs-unified-top-card__job-title'));
 
     return {
       detected: isLinkedIn,
       atsName: 'linkedin',
       confidence: isLinkedIn ? 0.95 : 0,
-      pageType: isAppForm ? 'application_form' : isSearchPage ? 'search_results' : isJobPage ? 'job_listing' : 'unknown',
+      pageType: isAppForm ? 'application_form' : isJobPage ? 'job_listing' : isSearchPage ? 'search_results' : 'unknown',
       metadata: {
-        hasEasyApply: String(hasEasyApply),
         url,
       },
     };
