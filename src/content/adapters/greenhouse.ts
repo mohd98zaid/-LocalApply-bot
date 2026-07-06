@@ -431,16 +431,19 @@ export class UniversalAdapter extends BaseATSAdapter {
 
     try {
       for (const field of unmapped) {
-        const response = await chrome.runtime.sendMessage({
-          type: 'CLASSIFY_FIELD',
-          payload: {
-            label: field.label,
-            placeholder: field.placeholder,
-            fieldType: field.type,
-            options: field.options,
-            surroundingHTML: field.element?.closest('[class], [id]')?.outerHTML?.slice(0, 500),
-          },
-        }).catch(() => null);
+        let response = null;
+        try {
+          response = await chrome.runtime.sendMessage({
+            type: 'CLASSIFY_FIELD',
+            payload: {
+              label: field.label,
+              placeholder: field.placeholder,
+              fieldType: field.type,
+              options: field.options,
+              surroundingHTML: field.element?.closest('[class], [id]')?.outerHTML?.slice(0, 500),
+            },
+          }).catch(() => null);
+        } catch (e) {}
 
         if (response?.success && response.data?.mappedField) {
           field.mappedProfileField = response.data.mappedField;

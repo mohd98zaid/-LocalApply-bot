@@ -49,13 +49,15 @@ async function analyzePage() {
 
   // Send to background service worker
   // Send to background service worker and catch context errors
-  chrome.runtime.sendMessage({
-    type: 'PAGE_ANALYSIS_RESULT',
-    payload: analysis,
-    timestamp: new Date().toISOString(),
-  }).catch(() => {
-    // Ignore "Extension context invalidated" errors for orphaned content scripts
-  });
+  try {
+    chrome.runtime.sendMessage({
+      type: 'PAGE_ANALYSIS_RESULT',
+      payload: analysis,
+      timestamp: new Date().toISOString(),
+    }).catch(() => {});
+  } catch (e) {
+    // Ignore "Extension context invalidated" synchronous errors
+  }
 }
 
 // ---- Message listener (commands from background/side panel) ----

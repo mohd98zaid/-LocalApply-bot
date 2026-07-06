@@ -22,10 +22,13 @@ export class AutofillOrchestrator {
 
     if (!profile) {
       // Request profile from background
-      const profileData = await chrome.runtime.sendMessage({
-        type: 'GET_PROFILE',
-        payload: { profileId: options.profileId },
-      }).catch(() => null);
+      let profileData = null;
+      try {
+        profileData = await chrome.runtime.sendMessage({
+          type: 'GET_PROFILE',
+          payload: { profileId: options.profileId },
+        }).catch(() => null);
+      } catch (e) {}
       if (!profileData?.data) throw new Error('Profile not found');
       return this.fillFields(fieldsToFill, profileData.data as CandidateProfile);
     }
@@ -51,19 +54,23 @@ export class AutofillOrchestrator {
         filledCount++;
 
         // Report progress
-        chrome.runtime.sendMessage({
-          type: 'FILL_RESULT',
-          payload: { fieldId: field.id, success: true, value, method: 'typing' } satisfies FillResult,
-        }).catch(() => {});
+        try {
+          chrome.runtime.sendMessage({
+            type: 'FILL_RESULT',
+            payload: { fieldId: field.id, success: true, value, method: 'typing' } satisfies FillResult,
+          }).catch(() => {});
+        } catch (e) {}
 
         // Human-like delay between fields
         await sleep(randomBetween(250, 700));
       } catch (e) {
         failed.push(field.label);
-        chrome.runtime.sendMessage({
-          type: 'FILL_RESULT',
-          payload: { fieldId: field.id, success: false, error: String(e), method: 'direct' } satisfies FillResult,
-        }).catch(() => {});
+        try {
+          chrome.runtime.sendMessage({
+            type: 'FILL_RESULT',
+            payload: { fieldId: field.id, success: false, error: String(e), method: 'direct' } satisfies FillResult,
+          }).catch(() => {});
+        } catch(e) {}
       }
     }
 

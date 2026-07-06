@@ -153,11 +153,11 @@ export class FloatingOverlay {
     this.container?.querySelector('#la-close')?.addEventListener('click', () => this.hide());
 
     this.container?.querySelector('#la-open-panel')?.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL', payload: {} }).catch(() => {});
+      try { chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL', payload: {} }).catch(() => {}); } catch(e) {}
     });
 
     this.container?.querySelector('#la-cover')?.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL', payload: { tab: 'cover' } }).catch(() => {});
+      try { chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL', payload: { tab: 'cover' } }).catch(() => {}); } catch(e) {}
     });
   }
 }
