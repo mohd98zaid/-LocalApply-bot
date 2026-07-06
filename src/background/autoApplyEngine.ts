@@ -85,11 +85,11 @@ export class AutoApplyEngine {
   async handlePageAnalysis(analysis: any, tabId: number) {
     if (!this.isRunning || tabId !== this.currentTabId) return;
 
-    if (analysis.isJobListingPage || analysis.isApplicationPage) {
+    if (analysis.isApplicationPage) {
       setTimeout(async () => {
         if (!this.isRunning) return;
         
-        console.log('[AutoApplyEngine] Triggering Autofill for job', this.currentIndex + 1);
+        console.log('[AutoApplyEngine] Form detected! Triggering Autofill for job', this.currentIndex + 1);
         
         const settings = await getSettings();
         const profileId = settings.activeProfileId || 'default';
@@ -101,6 +101,21 @@ export class AutoApplyEngine {
           mode,
           fieldsToFill: analysis.formFields
         }));
+      }, 2000);
+    } else if (analysis.isJobListingPage) {
+      setTimeout(async () => {
+        if (!this.isRunning) return;
+        
+        console.log('[AutoApplyEngine] Job page detected. Clicking Apply button...');
+        chrome.tabs.sendMessage(tabId, { type: 'CLICK_APPLY_BUTTON', payload: {} });
+        
+        // If the form doesn't appear after 10 seconds, move to next job
+        setTimeout(() => {
+          if (this.isRunning && this.currentTabId === tabId) {
+            // We could check if we are still stuck, but for now we'll just log
+            console.log('[AutoApplyEngine] Wait timeout after clicking apply.');
+          }
+        }, 10000);
       }, 2000);
     }
   }

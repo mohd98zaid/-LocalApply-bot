@@ -97,6 +97,44 @@ async function handleMessage(message: { type: string; payload?: unknown }) {
       return { success: true, links };
     }
 
+    case 'CLICK_APPLY_BUTTON': {
+      // Find and click the apply button
+      const applySelectors = [
+        '.jobs-apply-button--top-card', // LinkedIn Easy Apply (top card)
+        '[data-control-name="jobdetails_topcard_inapply"]', // LinkedIn alternative
+        'button.jobs-apply-button', // LinkedIn generic
+        'button.apply-message', // Naukri apply button
+        'button.apply-button',
+        '[data-automation-id="applyNowButton"]', // Workday
+        'a[data-mapped="true"]' // Greenhouse / Lever
+      ];
+      
+      let clicked = false;
+      for (const selector of applySelectors) {
+        const btn = document.querySelector<HTMLElement>(selector);
+        if (btn) {
+          btn.click();
+          clicked = true;
+          break;
+        }
+      }
+      
+      // If we couldn't find a specific button, try finding a button that contains "Apply" text
+      if (!clicked) {
+        const buttons = document.querySelectorAll('button, a.button, a.btn');
+        for (const btn of buttons) {
+          const text = (btn as HTMLElement).innerText.toLowerCase();
+          if (text === 'apply' || text === 'apply now' || text === 'easy apply') {
+            (btn as HTMLElement).click();
+            clicked = true;
+            break;
+          }
+        }
+      }
+      
+      return { success: clicked };
+    }
+
     case 'GET_PAGE_DATA':
       return await detector?.analyzePage(document);
 
