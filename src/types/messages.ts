@@ -25,6 +25,7 @@ export type MessageType =
   | 'AUTOFILL_ERROR'
   | 'STOP_AUTOFILL'
   | 'START_AUTO_APPLY_LOOP'
+  | 'START_AUTOMATION'
   | 'STOP_AUTO_APPLY_LOOP'
   | 'AUTO_APPLY_STATUS'
 
@@ -93,19 +94,15 @@ export type Messages = {
   PAGE_ANALYSIS_RESULT: Message<'PAGE_ANALYSIS_RESULT', PageAnalysis>;
   PAGE_CHANGED: Message<'PAGE_CHANGED', { url: string; tabId: number }>;
 
-  START_AUTOFILL: Message<'START_AUTOFILL', {
-    profileId: string;
-    jobId: string;
-    mode: string;
-    fieldsToFill: FormField[];
-  }>;
+  START_AUTOFILL: Message<'START_AUTOFILL', { profileId: string; jobId: string; fieldsToFill: any[]; mode: 'review' | 'copilot' | 'manual' | 'semi_auto' }>;
   FILL_FIELD: Message<'FILL_FIELD', { field: FormField; value: string }>;
-  FILL_RESULT: Message<'FILL_RESULT', FillResult>;
-  AUTOFILL_COMPLETE: Message<'AUTOFILL_COMPLETE', { filledCount: number; failedCount: number; result?: SubmissionResult }>;
+  FILL_RESULT: Message<'FILL_RESULT', { fieldId: string; success: boolean; error?: string; value?: string; method?: 'typing' | 'direct' }>;
+  AUTOFILL_COMPLETE: Message<'AUTOFILL_COMPLETE', { success: boolean; filledCount: number; error?: string }>;
   AUTOFILL_ERROR: Message<'AUTOFILL_ERROR', { code: string; message: string; recoverable: boolean }>;
   STOP_AUTOFILL: Message<'STOP_AUTOFILL', Record<string, never>>;
   
   START_AUTO_APPLY_LOOP: Message<'START_AUTO_APPLY_LOOP', { portal: 'linkedin' | 'naukri' | 'universal', tabId?: number }>;
+  START_AUTOMATION: Message<'START_AUTOMATION', { portal: 'linkedin', keywords: string, location: string }>;
   STOP_AUTO_APPLY_LOOP: Message<'STOP_AUTO_APPLY_LOOP', Record<string, never>>;
   AUTO_APPLY_STATUS: Message<'AUTO_APPLY_STATUS', { isRunning: boolean; currentJobIndex: number; totalJobsFound: number; jobsApplied: number }>;
 

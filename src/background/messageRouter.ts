@@ -184,6 +184,25 @@ class MessageRouter {
         return null;
       }
 
+      case 'START_AUTOMATION': {
+        const { portal, keywords, location } = payload as { portal: 'linkedin', keywords: string, location: string };
+        
+        // Build the LinkedIn search URL
+        const searchUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}`;
+        
+        // Open a new tab
+        const tab = await chrome.tabs.create({ url: searchUrl, active: true });
+        
+        if (tab.id) {
+          // Wait a bit for it to load, then start the engine
+          setTimeout(async () => {
+            await autoApplyEngine.start(tab.id!, portal);
+          }, 3000);
+        }
+        
+        return null;
+      }
+
       case 'STOP_AUTO_APPLY_LOOP': {
         autoApplyEngine.stop();
         return null;

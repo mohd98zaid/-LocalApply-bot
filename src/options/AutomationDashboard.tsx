@@ -5,16 +5,22 @@ export function AutomationDashboard({ settings, onSave }: { settings: ExtensionS
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>(['Automation engine ready.']);
 
+  const [keywords, setKeywords] = useState('ai, gen ai, agentic ai');
+  const [location, setLocation] = useState('india,gulf,remote');
+
   function startAutomation() {
     setIsRunning(true);
-    setLogs(prev => [...prev, 'Starting Auto-Apply on LinkedIn...']);
-    chrome.runtime.sendMessage({ type: 'START_AUTOMATION', payload: { portal: 'linkedin' } });
+    setLogs(prev => [...prev, `Starting Auto-Apply on LinkedIn for "${keywords}" in "${location}"...`]);
+    chrome.runtime.sendMessage({ 
+      type: 'START_AUTOMATION', 
+      payload: { portal: 'linkedin', keywords, location } 
+    }).catch(() => {});
   }
 
   function stopAutomation() {
     setIsRunning(false);
     setLogs(prev => [...prev, 'Automation stopped by user.']);
-    chrome.runtime.sendMessage({ type: 'STOP_AUTOMATION', payload: {} });
+    chrome.runtime.sendMessage({ type: 'STOP_AUTO_APPLY_LOOP', payload: {} }).catch(() => {});
   }
 
   return (
@@ -52,12 +58,12 @@ export function AutomationDashboard({ settings, onSave }: { settings: ExtensionS
       <div style={{ marginBottom: 20 }}>
         <label style={{ fontWeight: 500, fontSize: 13, display: 'block', marginBottom: 4 }}>Search Keywords</label>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>E.g. "React Developer", "Software Engineer"</p>
-        <input className="input" defaultValue="ai, gen ai, agentic ai" style={{ width: '100%' }} />
+        <input className="input" value={keywords} onChange={e => setKeywords(e.target.value)} style={{ width: '100%' }} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <label style={{ fontWeight: 500, fontSize: 13, display: 'block', marginBottom: 4 }}>Location / Filter</label>
-        <input className="input" defaultValue="india,gulf,remote" style={{ width: '100%' }} />
+        <input className="input" value={location} onChange={e => setLocation(e.target.value)} style={{ width: '100%' }} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
