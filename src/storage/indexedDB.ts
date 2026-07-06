@@ -245,3 +245,22 @@ export async function clearAllData(): Promise<void> {
   const storeNames = Array.from(db.objectStoreNames) as StoreName[];
   await Promise.all(storeNames.map(name => db.clear(name)));
 }
+
+export async function importData(data: Record<string, unknown[]>): Promise<void> {
+  const db = await getDB();
+  const storeNames = Array.from(db.objectStoreNames) as StoreName[];
+  
+  // Start a transaction for all stores
+  const tx = db.transaction(storeNames, 'readwrite');
+  
+  for (const storeName of storeNames) {
+    if (data[storeName] && Array.isArray(data[storeName])) {
+      const store = tx.objectStore(storeName);
+      for (const item of data[storeName]) {
+        store.put(item as any);
+      }
+    }
+  }
+  
+  await tx.done;
+}

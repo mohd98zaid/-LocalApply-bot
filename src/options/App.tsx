@@ -344,6 +344,24 @@ function DataSection({ settings, onSave }: { settings: ExtensionSettings; onSave
     a.click();
   }
 
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      const { importData } = await import('../storage/indexedDB');
+      await importData(data);
+      alert('Data imported successfully! The page will now reload.');
+      window.location.reload();
+    } catch (err) {
+      alert('Error importing data. Make sure it is a valid JSON file.');
+      console.error(err);
+    }
+  }
+
   async function clearAllData() {
     if (!confirm('⚠️ This will delete ALL your LocalApply data (profiles, resumes, applications). Are you sure?')) return;
     const { clearAllData: clear } = await import('../storage/indexedDB');
@@ -383,10 +401,17 @@ function DataSection({ settings, onSave }: { settings: ExtensionSettings; onSave
 
       <div className="divider" />
 
-      <Field label="Export Your Data">
-        <button className="btn-secondary" onClick={exportData} style={{ width: '100%' }}>
-          📥 Export All Data (JSON)
-        </button>
+      <Field label="Import / Export Your Data">
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn-secondary" onClick={exportData} style={{ flex: 1 }}>
+            📥 Export (JSON)
+          </button>
+          
+          <label className="btn-secondary" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'inline-block' }}>
+            📤 Import (JSON)
+            <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+          </label>
+        </div>
       </Field>
 
       <Field label="Clear All Data" desc="Permanently delete all stored profiles, resumes, and applications">
