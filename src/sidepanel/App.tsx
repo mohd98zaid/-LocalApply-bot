@@ -265,10 +265,21 @@ function AnalyzeTab({ pageAnalysis, ollamaStatus }: { pageAnalysis: PageAnalysis
           </div>
           <button
             className="btn-primary"
-            onClick={() => chrome.runtime.openOptionsPage()}
+            onClick={() => {
+              chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+                if (tab?.id) {
+                  const url = tab.url || '';
+                  const portal = url.includes('linkedin') ? 'linkedin' : url.includes('naukri') ? 'naukri' : 'universal';
+                  chrome.runtime.sendMessage({
+                    type: 'START_AUTO_APPLY_LOOP',
+                    payload: { portal }
+                  });
+                }
+              });
+            }}
             style={{ width: '100%', justifyContent: 'center' }}
           >
-            🚀 Open Auto-Apply Settings
+            🚀 Start Auto-Apply Loop
           </button>
         </div>
       )}

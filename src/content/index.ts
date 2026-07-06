@@ -80,6 +80,23 @@ async function handleMessage(message: { type: string; payload?: unknown }) {
       return EventSimulator.fillField(field, value);
     }
 
+    case 'SCRAPE_JOB_LINKS': {
+      const { portal } = message.payload as { portal: string };
+      let links: string[] = [];
+      
+      if (portal === 'linkedin') {
+        const anchors = document.querySelectorAll<HTMLAnchorElement>('a.job-card-container__link, a.base-card__full-link');
+        links = Array.from(anchors).map(a => a.href.split('?')[0]);
+      } else if (portal === 'naukri') {
+        const anchors = document.querySelectorAll<HTMLAnchorElement>('a.title');
+        links = Array.from(anchors).map(a => a.href);
+      }
+      
+      // Deduplicate
+      links = [...new Set(links)];
+      return { success: true, links };
+    }
+
     case 'GET_PAGE_DATA':
       return await detector?.analyzePage(document);
 

@@ -18,13 +18,15 @@ export type MessageType =
   | 'PAGE_ANALYSIS_RESULT'
   | 'PAGE_CHANGED'
 
-  // Autofill
   | 'START_AUTOFILL'
   | 'FILL_FIELD'
   | 'FILL_RESULT'
   | 'AUTOFILL_COMPLETE'
   | 'AUTOFILL_ERROR'
   | 'STOP_AUTOFILL'
+  | 'START_AUTO_APPLY_LOOP'
+  | 'STOP_AUTO_APPLY_LOOP'
+  | 'AUTO_APPLY_STATUS'
 
   // Resume
   | 'PARSE_RESUME_FILE'
@@ -102,6 +104,10 @@ export type Messages = {
   AUTOFILL_COMPLETE: Message<'AUTOFILL_COMPLETE', { filledCount: number; failedCount: number; result?: SubmissionResult }>;
   AUTOFILL_ERROR: Message<'AUTOFILL_ERROR', { code: string; message: string; recoverable: boolean }>;
   STOP_AUTOFILL: Message<'STOP_AUTOFILL', Record<string, never>>;
+  
+  START_AUTO_APPLY_LOOP: Message<'START_AUTO_APPLY_LOOP', { portal: 'linkedin' | 'naukri' | 'universal' }>;
+  STOP_AUTO_APPLY_LOOP: Message<'STOP_AUTO_APPLY_LOOP', Record<string, never>>;
+  AUTO_APPLY_STATUS: Message<'AUTO_APPLY_STATUS', { isRunning: boolean; currentJobIndex: number; totalJobsFound: number; jobsApplied: number }>;
 
   PARSE_RESUME_FILE: Message<'PARSE_RESUME_FILE', { data: ArrayBuffer; type: string; fileName: string }>;
   UPLOAD_RESUME: Message<'UPLOAD_RESUME', { data: number[]; type: string; fileName: string }>;

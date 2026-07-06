@@ -8,6 +8,7 @@ import { getOllamaClient } from '../ai/ollama/client';
 import { getSettings, saveSettings, saveTabAnalysis } from '../storage/chromeStorage';
 import { profilesDB, jobsDB, applicationsDB } from '../storage/indexedDB';
 import { parseResumeFile } from './resumeParser';
+import { autoApplyEngine } from './autoApplyEngine';
 import { QUESTION_ANSWERER_PROMPT, COVER_LETTER_PROMPT, JOB_MATCHER_PROMPT, interpolatePrompt } from '../ai/prompts/index';
 
 interface MessageSender {
@@ -136,6 +137,8 @@ class MessageRouter {
         // Store analysis result from content script
         if (sender.tab?.id) {
           await saveTabAnalysis(sender.tab.id, payload);
+          // Notify auto apply engine if running
+          autoApplyEngine.handlePageAnalysis(payload, sender.tab.id);
         }
         // Broadcast to side panel
         chrome.runtime.sendMessage({ type: 'PAGE_ANALYSIS_RESULT', payload });
@@ -162,6 +165,26 @@ class MessageRouter {
       case 'FILL_RESULT': {
         // Relay fill result from content script to side panel
         chrome.runtime.sendMessage({ type: 'FILL_RESULT', payload });
+        return null;
+      }
+
+      case 'AUTOFILL_COMPLETE': {
+        autoApplyEngine.handleAutofillComplete(payload);
+        return null;
+      }
+
+      // ---- Auto Apply Loop ----
+
+      case 'START_AUTO_APPLY_LOOP': {
+        const { portal } = payload as { portal: 'linkedin' | 'naukri' | 'universal' };
+        if (sender.tab?.id) {
+          await autoApplyEngine.start(sender.tab.id, portal);
+        }
+        return null;
+      }
+
+      case 'STOP_AUTO_APPLY_LOOP': {
+        autoApplyEngine.stop();
         return null;
       }
 
