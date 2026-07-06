@@ -55,7 +55,8 @@
         "*://*.smartrecruiters.com/*",
         "*://*.jobvite.com/*",
         "*://wellfound.com/jobs/*",
-        "*://wellfound.com/l/2/*"
+        "*://wellfound.com/l/2/*",
+        "*://*.naukri.com/*"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle",

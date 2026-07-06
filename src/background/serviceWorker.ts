@@ -77,6 +77,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     'smartrecruiters.com',
     'jobvite.com',
     'wellfound.com',
+    'naukri.com',
   ];
 
   const isJobSite = supportedSites.some(site => tab.url!.includes(site));

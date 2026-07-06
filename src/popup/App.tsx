@@ -23,7 +23,7 @@ export default function PopupApp() {
 
       // Check current tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const jobSites = ['linkedin.com/jobs', 'indeed.com', 'greenhouse.io', 'lever.co', 'myworkdayjobs.com', 'ashbyhq.com'];
+      const jobSites = ['linkedin.com/jobs', 'indeed.com', 'greenhouse.io', 'lever.co', 'myworkdayjobs.com', 'ashbyhq.com', 'naukri.com'];
       setIsOnJobPage(jobSites.some(s => tab?.url?.includes(s)));
     }
     load();
