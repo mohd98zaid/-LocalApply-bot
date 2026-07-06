@@ -285,7 +285,7 @@ export class WorkdayAdapter extends BaseATSAdapter {
   async detect(doc: Document): Promise<ATSDetectionResult> {
     const url = window.location.href;
     const isWorkday = url.includes('myworkdayjobs.com') ||
-      !!doc.querySelector('[data-automation-id], .WDFC, [class*="WDHeaderContainer"]');
+      !!doc.querySelector('.WDFC, [class*="WDHeaderContainer"], script[src*="workday"]');
 
     const isAppForm = url.includes('/apply/') || !!doc.querySelector(
       '[data-automation-id="applicationForm"], [data-automation-id="Application"], [data-automation-id="file-upload-drop-zone"]'
@@ -410,11 +410,13 @@ export class UniversalAdapter extends BaseATSAdapter {
        window.location.href.includes('/career'))
     );
 
+    const isSearchPage = window.location.href.includes('/search') || window.location.href.includes('-jobs');
+
     return {
-      detected: hasJobTitle,
+      detected: hasJobTitle || isSearchPage,
       atsName: 'universal',
-      confidence: hasForm && hasJobTitle ? 0.5 : 0.3,
-      pageType: hasForm ? 'application_form' : hasJobTitle ? 'job_listing' : 'unknown',
+      confidence: hasForm && hasJobTitle ? 0.5 : isSearchPage ? 0.4 : 0.3,
+      pageType: hasForm ? 'application_form' : isSearchPage ? 'search_results' : hasJobTitle ? 'job_listing' : 'unknown',
       metadata: { detected: 'universal', url: window.location.href },
     };
   }
