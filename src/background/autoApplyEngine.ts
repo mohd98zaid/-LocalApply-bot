@@ -12,6 +12,10 @@ export class AutoApplyEngine {
   private portal: 'linkedin' | 'naukri' | 'universal' = 'universal';
   private jobLinks: string[] = [];
   private currentIndex = 0;
+  
+  // State flags to prevent spamming actions
+  private hasTriggeredApplyForCurrentJob = false;
+  private hasTriggeredAutofillForCurrentJob = false;
 
   constructor() {}
 
@@ -78,6 +82,10 @@ export class AutoApplyEngine {
     
     this.broadcastStatus();
 
+    // Reset state flags for this job
+    this.hasTriggeredApplyForCurrentJob = false;
+    this.hasTriggeredAutofillForCurrentJob = false;
+
     // Navigate the tab to the job URL
     await chrome.tabs.update(this.currentTabId, { url: jobUrl });
   }
@@ -85,7 +93,8 @@ export class AutoApplyEngine {
   async handlePageAnalysis(analysis: any, tabId: number) {
     if (!this.isRunning || tabId !== this.currentTabId) return;
 
-    if (analysis.isApplicationPage) {
+    if (analysis.isApplicationPage && !this.hasTriggeredAutofillForCurrentJob) {
+      this.hasTriggeredAutofillForCurrentJob = true;
       setTimeout(async () => {
         if (!this.isRunning) return;
         
@@ -102,7 +111,8 @@ export class AutoApplyEngine {
           fieldsToFill: analysis.formFields
         }));
       }, 2000);
-    } else if (analysis.isJobListingPage) {
+    } else if (analysis.isJobListingPage && !analysis.isApplicationPage && !this.hasTriggeredApplyForCurrentJob) {
+      this.hasTriggeredApplyForCurrentJob = true;
       setTimeout(async () => {
         if (!this.isRunning) return;
         
@@ -111,9 +121,9 @@ export class AutoApplyEngine {
         
         // If the form doesn't appear after 10 seconds, move to next job
         setTimeout(() => {
-          if (this.isRunning && this.currentTabId === tabId) {
-            // We could check if we are still stuck, but for now we'll just log
-            console.log('[AutoApplyEngine] Wait timeout after clicking apply.');
+          if (this.isRunning && this.currentTabId === tabId && !this.hasTriggeredAutofillForCurrentJob) {
+            console.log('[AutoApplyEngine] Wait timeout after clicking apply. Moving to next job.');
+            this.handleAutofillComplete({ success: false, reason: 'timeout' });
           }
         }, 10000);
       }, 2000);

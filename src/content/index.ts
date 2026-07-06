@@ -21,13 +21,15 @@ async function initialize() {
   // Initial page analysis
   await analyzePage();
 
-  // Watch for SPA navigation (hash/pushState changes)
+  // Watch for DOM changes (modals popping up, etc.)
   const observer = new MutationObserver(debounce(async () => {
+    // If the URL changed, update it
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
-      await analyzePage();
     }
-  }, 1500));
+    // Always re-analyze because SPAs pop up modals without URL changes
+    await analyzePage();
+  }, 1000));
 
   observer.observe(document.body, { childList: true, subtree: true });
 }
