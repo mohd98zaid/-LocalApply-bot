@@ -11,6 +11,10 @@ export default function PopupApp() {
   const [isOnJobPage, setIsOnJobPage] = useState(false);
   const [matchScore, setMatchScore] = useState<number | null>(null);
 
+  // Search state
+  const [searchJobTitle, setSearchJobTitle] = useState('');
+  const [searchPortal, setSearchPortal] = useState('linkedin');
+
   useEffect(() => {
     async function load() {
       // Check Ollama
@@ -37,6 +41,28 @@ export default function PopupApp() {
   function openOptions() {
     chrome.runtime.openOptionsPage();
     window.close();
+  }
+
+  function handleSearch() {
+    const query = encodeURIComponent(searchJobTitle);
+    let url = '';
+    switch(searchPortal) {
+      case 'linkedin': 
+        url = query ? `https://www.linkedin.com/jobs/search/?keywords=${query}` : 'https://www.linkedin.com/jobs/'; 
+        break;
+      case 'naukri': 
+        url = query ? `https://www.naukri.com/${query.replace(/%20/g, '-')}-jobs` : 'https://www.naukri.com/'; 
+        break;
+      case 'indeed': 
+        url = query ? `https://www.indeed.com/jobs?q=${query}` : 'https://www.indeed.com/'; 
+        break;
+      case 'wellfound': 
+        url = query ? `https://wellfound.com/role/${query.replace(/%20/g, '-')}` : 'https://wellfound.com/jobs'; 
+        break;
+    }
+    if (url) {
+      chrome.tabs.create({ url });
+    }
   }
 
   return (
@@ -146,6 +172,46 @@ export default function PopupApp() {
             style={{ fontSize: 12, padding: '8px', textAlign: 'center' }}
           >
             📖 GitHub
+          </button>
+        </div>
+
+        {/* Quick Job Search */}
+        <div style={{
+          marginTop: 6,
+          paddingTop: 14,
+          borderTop: '1px solid var(--color-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>🔍 Quick Job Search</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select 
+              className="input" 
+              value={searchPortal} 
+              onChange={(e) => setSearchPortal(e.target.value)}
+              style={{ padding: '6px', fontSize: 12, flexShrink: 0, width: '90px' }}
+            >
+              <option value="linkedin">LinkedIn</option>
+              <option value="naukri">Naukri</option>
+              <option value="indeed">Indeed</option>
+              <option value="wellfound">Wellfound</option>
+            </select>
+            <input 
+              className="input" 
+              value={searchJobTitle} 
+              onChange={(e) => setSearchJobTitle(e.target.value)} 
+              placeholder="Job title..." 
+              style={{ padding: '6px', fontSize: 12, flex: 1 }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            />
+          </div>
+          <button 
+            className="btn-primary" 
+            onClick={handleSearch} 
+            style={{ width: '100%', justifyContent: 'center', padding: '6px', fontSize: 12, background: 'var(--color-surface-3)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+          >
+            Search on Portal ↗
           </button>
         </div>
       </div>
