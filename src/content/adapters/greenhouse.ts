@@ -415,8 +415,8 @@ export class UniversalAdapter extends BaseATSAdapter {
     return {
       detected: hasJobTitle || isSearchPage,
       atsName: 'universal',
-      confidence: hasForm && hasJobTitle ? 0.5 : isSearchPage ? 0.4 : 0.3,
-      pageType: hasForm ? 'application_form' : isSearchPage ? 'search_results' : hasJobTitle ? 'job_listing' : 'unknown',
+      confidence: isSearchPage ? 0.6 : hasForm && hasJobTitle ? 0.5 : 0.3,
+      pageType: isSearchPage ? 'search_results' : hasForm ? 'application_form' : hasJobTitle ? 'job_listing' : 'unknown',
       metadata: { detected: 'universal', url: window.location.href },
     };
   }
