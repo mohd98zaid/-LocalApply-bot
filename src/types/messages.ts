@@ -105,7 +105,7 @@ export type Messages = {
   AUTOFILL_ERROR: Message<'AUTOFILL_ERROR', { code: string; message: string; recoverable: boolean }>;
   STOP_AUTOFILL: Message<'STOP_AUTOFILL', Record<string, never>>;
   
-  START_AUTO_APPLY_LOOP: Message<'START_AUTO_APPLY_LOOP', { portal: 'linkedin' | 'naukri' | 'universal' }>;
+  START_AUTO_APPLY_LOOP: Message<'START_AUTO_APPLY_LOOP', { portal: 'linkedin' | 'naukri' | 'universal', tabId?: number }>;
   STOP_AUTO_APPLY_LOOP: Message<'STOP_AUTO_APPLY_LOOP', Record<string, never>>;
   AUTO_APPLY_STATUS: Message<'AUTO_APPLY_STATUS', { isRunning: boolean; currentJobIndex: number; totalJobsFound: number; jobsApplied: number }>;
 

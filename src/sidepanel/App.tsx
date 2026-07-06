@@ -272,7 +272,7 @@ function AnalyzeTab({ pageAnalysis, ollamaStatus }: { pageAnalysis: PageAnalysis
                   const portal = url.includes('linkedin') ? 'linkedin' : url.includes('naukri') ? 'naukri' : 'universal';
                   chrome.runtime.sendMessage({
                     type: 'START_AUTO_APPLY_LOOP',
-                    payload: { portal }
+                    payload: { portal, tabId: tab.id }
                   });
                 }
               });

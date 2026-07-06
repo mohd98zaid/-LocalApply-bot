@@ -176,9 +176,10 @@ class MessageRouter {
       // ---- Auto Apply Loop ----
 
       case 'START_AUTO_APPLY_LOOP': {
-        const { portal } = payload as { portal: 'linkedin' | 'naukri' | 'universal' };
-        if (sender.tab?.id) {
-          await autoApplyEngine.start(sender.tab.id, portal);
+        const { portal, tabId } = payload as { portal: 'linkedin' | 'naukri' | 'universal', tabId?: number };
+        const targetTabId = sender.tab?.id || tabId;
+        if (targetTabId) {
+          await autoApplyEngine.start(targetTabId, portal);
         }
         return null;
       }
