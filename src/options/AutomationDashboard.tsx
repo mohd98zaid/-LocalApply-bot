@@ -52,12 +52,12 @@ export function AutomationDashboard({ settings, onSave }: { settings: ExtensionS
       <div style={{ marginBottom: 20 }}>
         <label style={{ fontWeight: 500, fontSize: 13, display: 'block', marginBottom: 4 }}>Search Keywords</label>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>E.g. "React Developer", "Software Engineer"</p>
-        <input className="input" defaultValue="Frontend Developer" style={{ width: '100%' }} />
+        <input className="input" defaultValue="ai, gen ai, agentic ai" style={{ width: '100%' }} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <label style={{ fontWeight: 500, fontSize: 13, display: 'block', marginBottom: 4 }}>Location / Filter</label>
-        <input className="input" defaultValue="Remote, United States" style={{ width: '100%' }} />
+        <input className="input" defaultValue="india,gulf,remote" style={{ width: '100%' }} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
