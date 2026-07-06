@@ -116,16 +116,22 @@ export class AutoApplyEngine {
       setTimeout(async () => {
         if (!this.isRunning) return;
         
-        console.log('[AutoApplyEngine] Job page detected. Clicking Apply button...');
-        chrome.tabs.sendMessage(tabId, { type: 'CLICK_APPLY_BUTTON', payload: {} });
-        
-        // If the form doesn't appear after 10 seconds, move to next job
-        setTimeout(() => {
-          if (this.isRunning && this.currentTabId === tabId && !this.hasTriggeredAutofillForCurrentJob) {
-            console.log('[AutoApplyEngine] Wait timeout after clicking apply. Moving to next job.');
-            this.handleAutofillComplete({ success: false, reason: 'timeout' });
+        console.log('[AutoApplyEngine] Job page detected. Attempting to click Apply button...');
+        chrome.tabs.sendMessage(tabId, { type: 'CLICK_APPLY_BUTTON', payload: {} }, (response) => {
+          if (!response || !response.success) {
+            console.log('[AutoApplyEngine] Apply button not found yet. Will retry on next DOM mutation.');
+            this.hasTriggeredApplyForCurrentJob = false;
+          } else {
+            console.log('[AutoApplyEngine] Successfully clicked Apply button. Waiting for form to appear...');
+            // If the form doesn't appear after 15 seconds, move to next job
+            setTimeout(() => {
+              if (this.isRunning && this.currentTabId === tabId && !this.hasTriggeredAutofillForCurrentJob) {
+                console.log('[AutoApplyEngine] Wait timeout after clicking apply. Moving to next job.');
+                this.handleAutofillComplete({ success: false, reason: 'timeout' });
+              }
+            }, 15000);
           }
-        }, 10000);
+        });
       }, 2000);
     }
   }
