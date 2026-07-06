@@ -25,7 +25,7 @@ export class AutofillOrchestrator {
       const profileData = await chrome.runtime.sendMessage({
         type: 'GET_PROFILE',
         payload: { profileId: options.profileId },
-      });
+      }).catch(() => null);
       if (!profileData?.data) throw new Error('Profile not found');
       return this.fillFields(fieldsToFill, profileData.data as CandidateProfile);
     }
@@ -54,7 +54,7 @@ export class AutofillOrchestrator {
         chrome.runtime.sendMessage({
           type: 'FILL_RESULT',
           payload: { fieldId: field.id, success: true, value, method: 'typing' } satisfies FillResult,
-        });
+        }).catch(() => {});
 
         // Human-like delay between fields
         await sleep(randomBetween(250, 700));
@@ -63,7 +63,7 @@ export class AutofillOrchestrator {
         chrome.runtime.sendMessage({
           type: 'FILL_RESULT',
           payload: { fieldId: field.id, success: false, error: String(e), method: 'direct' } satisfies FillResult,
-        });
+        }).catch(() => {});
       }
     }
 

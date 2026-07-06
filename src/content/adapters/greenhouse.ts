@@ -440,7 +440,7 @@ export class UniversalAdapter extends BaseATSAdapter {
             options: field.options,
             surroundingHTML: field.element?.closest('[class], [id]')?.outerHTML?.slice(0, 500),
           },
-        });
+        }).catch(() => null);
 
         if (response?.success && response.data?.mappedField) {
           field.mappedProfileField = response.data.mappedField;
