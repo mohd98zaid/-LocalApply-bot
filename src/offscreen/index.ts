@@ -8,6 +8,9 @@ import { parseResumeWithPdfjs } from './pdfParser';
 import { parseResumeWithMammoth } from './docxParser';
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type !== 'PARSE_RESUME_FILE') {
+    return false;
+  }
   handleOffscreenMessage(message)
     .then(result => sendResponse({ success: true, data: result }))
     .catch(err => sendResponse({ success: false, error: String(err) }));
