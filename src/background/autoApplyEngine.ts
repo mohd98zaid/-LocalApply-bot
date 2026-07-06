@@ -17,7 +17,17 @@ export class AutoApplyEngine {
   private hasTriggeredApplyForCurrentJob = false;
   private hasTriggeredAutofillForCurrentJob = false;
 
-  constructor() {}
+  private externalTabId: number | null = null;
+
+  constructor() {
+    // Listen for new tabs opening (e.g. clicking an external "Apply" button)
+    chrome.tabs.onCreated.addListener((tab) => {
+      if (this.isRunning && tab.openerTabId === this.currentTabId && tab.id) {
+        console.log(`[AutoApplyEngine] External apply button opened new tab (${tab.id}). Tracking external tab...`);
+        this.externalTabId = tab.id;
+      }
+    });
+  }
 
   async start(tabId: number, portal: 'linkedin' | 'naukri' | 'universal') {
     if (this.isRunning) return;
@@ -85,13 +95,17 @@ export class AutoApplyEngine {
     // Reset state flags for this job
     this.hasTriggeredApplyForCurrentJob = false;
     this.hasTriggeredAutofillForCurrentJob = false;
+    this.externalTabId = null;
 
-    // Navigate the tab to the job URL
-    await chrome.tabs.update(this.currentTabId, { url: jobUrl });
+    // Navigate the original tab to the job URL
+    await chrome.tabs.update(this.currentTabId, { url: jobUrl, active: true });
   }
 
   async handlePageAnalysis(analysis: any, tabId: number) {
-    if (!this.isRunning || tabId !== this.currentTabId) return;
+    if (!this.isRunning) return;
+    
+    // Only accept analysis from the main tab or the tracked external tab
+    if (tabId !== this.currentTabId && tabId !== this.externalTabId) return;
 
     if (analysis.isApplicationPage && !this.hasTriggeredAutofillForCurrentJob) {
       this.hasTriggeredAutofillForCurrentJob = true;
@@ -124,8 +138,9 @@ export class AutoApplyEngine {
           } else {
             console.log('[AutoApplyEngine] Successfully clicked Apply button. Waiting for form to appear...');
             // If the form doesn't appear after 15 seconds, move to next job
+            const jobIndexAtClick = this.currentIndex;
             setTimeout(() => {
-              if (this.isRunning && this.currentTabId === tabId && !this.hasTriggeredAutofillForCurrentJob) {
+              if (this.isRunning && this.currentIndex === jobIndexAtClick && !this.hasTriggeredAutofillForCurrentJob) {
                 console.log('[AutoApplyEngine] Wait timeout after clicking apply. Moving to next job.');
                 this.handleAutofillComplete({ success: false, reason: 'timeout' });
               }
@@ -140,6 +155,18 @@ export class AutoApplyEngine {
     if (!this.isRunning) return;
     
     console.log('[AutoApplyEngine] Autofill complete for job', this.currentIndex + 1);
+    
+    // Close external tab if one was opened
+    if (this.externalTabId) {
+      chrome.tabs.remove(this.externalTabId).catch(() => {});
+      this.externalTabId = null;
+      
+      // Focus the original tab back
+      if (this.currentTabId) {
+        chrome.tabs.update(this.currentTabId, { active: true }).catch(() => {});
+      }
+    }
+    
     this.currentIndex++;
     
     setTimeout(() => {
