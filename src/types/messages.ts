@@ -82,6 +82,7 @@ export interface PageAnalysis {
   questions: ApplicationQuestion[];
   isApplicationPage: boolean;
   isJobListingPage: boolean;
+  isSearchPage: boolean;
 }
 
 // Typed message map

@@ -192,6 +192,7 @@ function AnalyzeTab({ pageAnalysis, ollamaStatus }: { pageAnalysis: PageAnalysis
 
   const ats = pageAnalysis?.ats;
   const isJobPage = pageAnalysis?.isJobListingPage || pageAnalysis?.isApplicationPage;
+  const isSearchPage = pageAnalysis?.isSearchPage;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -250,6 +251,25 @@ function AnalyzeTab({ pageAnalysis, ollamaStatus }: { pageAnalysis: PageAnalysis
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Auto-Apply Controller (Search Pages) */}
+      {isSearchPage && (
+        <div className="glass-card" style={{ padding: '14px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>
+            Search Page Automation
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+            LocalApply can automatically parse jobs in this search list and apply to them on your behalf.
+          </div>
+          <button
+            className="btn-primary"
+            onClick={() => chrome.runtime.openOptionsPage()}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            🚀 Open Auto-Apply Settings
+          </button>
         </div>
       )}
 

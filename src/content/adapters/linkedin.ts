@@ -22,8 +22,10 @@ export class LinkedInAdapter extends BaseATSAdapter {
     const hasEasyApply = !!doc.querySelector(
       '.jobs-easy-apply-content, .jobs-apply-button--top-card, [data-control-name="jobdetails_topcard_inapply"]'
     );
+    // Search results page
+    const isSearchPage = url.includes('/jobs/search/') && !doc.querySelector('.jobs-easy-apply-modal, .jobs-apply-form');
     // Job listing
-    const isJobPage = url.includes('/jobs/view/') || url.includes('/jobs/search/');
+    const isJobPage = url.includes('/jobs/view/') || (url.includes('/jobs/search/') && hasEasyApply);
     // Application form
     const isAppForm = !!doc.querySelector('.jobs-easy-apply-modal, .jobs-apply-form');
 
@@ -31,7 +33,7 @@ export class LinkedInAdapter extends BaseATSAdapter {
       detected: isLinkedIn,
       atsName: 'linkedin',
       confidence: isLinkedIn ? 0.95 : 0,
-      pageType: isAppForm ? 'application_form' : isJobPage ? 'job_listing' : 'unknown',
+      pageType: isAppForm ? 'application_form' : isSearchPage ? 'search_results' : isJobPage ? 'job_listing' : 'unknown',
       metadata: {
         hasEasyApply: String(hasEasyApply),
         url,

@@ -59,6 +59,7 @@ export class ATSDetector {
 
     const isApplicationPage = detectionResult.pageType === 'application_form';
     const isJobListingPage = detectionResult.pageType === 'job_listing';
+    const isSearchPage = detectionResult.pageType === 'search_results';
 
     let jobDescription = undefined;
     let formFields: FormField[] = [];
@@ -92,6 +93,7 @@ export class ATSDetector {
       questions,
       isApplicationPage,
       isJobListingPage,
+      isSearchPage,
     };
   }
 }

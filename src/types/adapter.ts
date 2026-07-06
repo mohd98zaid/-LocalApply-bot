@@ -22,7 +22,7 @@ export interface ATSDetectionResult {
   detected: boolean;
   atsName: ATSName;
   confidence: number; // 0–1
-  pageType: 'job_listing' | 'application_form' | 'confirmation' | 'dashboard' | 'unknown';
+  pageType: 'job_listing' | 'application_form' | 'confirmation' | 'dashboard' | 'search_results' | 'unknown';
   metadata: Record<string, string>;
 }
 
