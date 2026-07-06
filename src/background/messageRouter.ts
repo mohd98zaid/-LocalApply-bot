@@ -85,6 +85,16 @@ class MessageRouter {
         return profile;
       }
 
+      // ---- Resumes ----
+
+      case 'UPLOAD_RESUME': {
+        const { data, type: mimeType, fileName } = payload as { data: number[]; type: string; fileName: string };
+        const { parseResumeFile } = await import('./resumeParser');
+        // Convert number[] back to ArrayBuffer
+        const buffer = new Uint8Array(data).buffer;
+        return parseResumeFile(buffer, mimeType, fileName);
+      }
+
       // ---- Jobs ----
 
       case 'MATCH_JOB': {

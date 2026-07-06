@@ -28,6 +28,7 @@ export type MessageType =
 
   // Resume
   | 'PARSE_RESUME_FILE'
+  | 'UPLOAD_RESUME'
   | 'RESUME_PARSED'
   | 'RESUME_PARSE_ERROR'
 
@@ -102,6 +103,7 @@ export type Messages = {
   STOP_AUTOFILL: Message<'STOP_AUTOFILL', Record<string, never>>;
 
   PARSE_RESUME_FILE: Message<'PARSE_RESUME_FILE', { data: ArrayBuffer; type: string; fileName: string }>;
+  UPLOAD_RESUME: Message<'UPLOAD_RESUME', { data: number[]; type: string; fileName: string }>;
   RESUME_PARSED: Message<'RESUME_PARSED', ParsedResume>;
   RESUME_PARSE_ERROR: Message<'RESUME_PARSE_ERROR', { error: string }>;
 

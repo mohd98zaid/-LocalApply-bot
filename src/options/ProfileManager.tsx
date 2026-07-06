@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { CandidateProfile, ParsedResume, ScreeningAnswer, Address } from '../types/resume';
 import { profilesDB } from '../storage/indexedDB';
 
@@ -494,6 +494,9 @@ function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, on
 // ---- Resumes Tab ----
 function ResumesTab({ profile, onSave }: { profile: CandidateProfile, onSave: (p: CandidateProfile) => void }) {
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleDeleteResume = (resumeId: string) => {
     if (!confirm('Remove this resume from the profile?')) return;
     const updatedResumes = profile.resumes.filter(r => r.id !== resumeId);
@@ -508,19 +511,68 @@ function ResumesTab({ profile, onSave }: { profile: CandidateProfile, onSave: (p
     onSave({ ...profile, activeResumeId: resumeId });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const data = Array.from(new Uint8Array(buffer));
+      
+      const response = await chrome.runtime.sendMessage({
+        type: 'UPLOAD_RESUME',
+        payload: {
+          data,
+          type: file.type,
+          fileName: file.name
+        }
+      });
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to parse resume');
+      }
+
+      const parsedResume = response.data;
+      const updatedResumes = [...profile.resumes, parsedResume];
+      onSave({ 
+        ...profile, 
+        resumes: updatedResumes, 
+        activeResumeId: profile.activeResumeId || parsedResume.id 
+      });
+
+    } catch (err) {
+      alert(`Error uploading resume: ${err}`);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       
-      <div style={{ 
-        padding: '16px', 
-        background: 'rgba(99, 102, 241, 0.1)', 
-        borderRadius: 'var(--radius-md)', 
-        border: '1px solid rgba(99, 102, 241, 0.2)',
-        fontSize: '13px',
-        color: 'var(--color-text)',
-      }}>
-        💡 <strong>Pro Tip:</strong> To upload and parse new resumes, open the LocalApply Side Panel while browsing jobs. 
-        Any resumes uploaded there will appear here for you to manage.
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: 0 }}>
+          Upload your PDF or DOCX resume. The local AI will parse and extract your experience to fill out applications.
+        </p>
+        
+        <input 
+          type="file" 
+          accept=".pdf,.docx" 
+          ref={fileInputRef} 
+          style={{ display: 'none' }} 
+          onChange={handleFileUpload} 
+        />
+        
+        <button 
+          className="btn-primary" 
+          onClick={() => fileInputRef.current?.click()} 
+          disabled={isUploading}
+          style={{ padding: '8px 16px', fontSize: '13px', minWidth: '160px' }}
+        >
+          {isUploading ? '🤖 Parsing with AI...' : '📤 Upload Resume'}
+        </button>
       </div>
 
       {profile.resumes.length === 0 ? (
