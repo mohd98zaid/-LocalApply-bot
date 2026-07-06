@@ -5,7 +5,7 @@
 
 import { messageRouter } from './messageRouter';
 import { getOllamaClient } from '../ai/ollama/client';
-import { getSettings, setBadge } from '../storage/chromeStorage';
+import { getSettings, setBadge, clearTabAnalysis, storageSet } from '../storage/chromeStorage';
 
 // ---- Lifecycle ----
 
@@ -24,6 +24,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // ---- Message Router ----
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Ignore messages meant for the offscreen document to avoid listener collision
+  if (message.type === 'PARSE_RESUME_FILE') {
+    return false; 
+  }
   messageRouter.handle(message, sender, sendResponse);
   return true; // Keep channel open for async responses
 });
@@ -64,7 +68,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   // Clean up session data for closed tab
-  const { clearTabAnalysis } = await import('../storage/chromeStorage');
   await clearTabAnalysis(tabId);
 });
 
@@ -80,7 +83,6 @@ async function startHealthCheck() {
   async function checkAndBroadcast() {
     const status = await client.getStatus();
     // Store in session for quick access
-    const { storageSet } = await import('../storage/chromeStorage');
     await storageSet('ollama_status', status, 'session');
   }
 

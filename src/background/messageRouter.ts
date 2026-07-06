@@ -5,8 +5,10 @@
 
 import type { MessageType } from '../types/messages';
 import { getOllamaClient } from '../ai/ollama/client';
-import { getSettings, saveSettings } from '../storage/chromeStorage';
+import { getSettings, saveSettings, saveTabAnalysis } from '../storage/chromeStorage';
 import { profilesDB, jobsDB, applicationsDB } from '../storage/indexedDB';
+import { parseResumeFile } from './resumeParser';
+import { QUESTION_ANSWERER_PROMPT, COVER_LETTER_PROMPT, JOB_MATCHER_PROMPT, interpolatePrompt } from '../ai/prompts/index';
 
 interface MessageSender {
   tab?: chrome.tabs.Tab;
@@ -89,7 +91,6 @@ class MessageRouter {
 
       case 'UPLOAD_RESUME': {
         const { data, type: mimeType, fileName } = payload as { data: number[]; type: string; fileName: string };
-        const { parseResumeFile } = await import('./resumeParser');
         // Convert number[] back to ArrayBuffer
         const buffer = new Uint8Array(data).buffer;
         return parseResumeFile(buffer, mimeType, fileName);
@@ -133,7 +134,6 @@ class MessageRouter {
 
       case 'PAGE_ANALYSIS_RESULT': {
         // Store analysis result from content script
-        const { saveTabAnalysis } = await import('../storage/chromeStorage');
         if (sender.tab?.id) {
           await saveTabAnalysis(sender.tab.id, payload);
         }
@@ -179,7 +179,6 @@ class MessageRouter {
   ) {
     const settings = await getSettings();
     const client = getOllamaClient(settings.ai.ollamaUrl);
-    const { QUESTION_ANSWERER_PROMPT, interpolatePrompt } = await import('../ai/prompts/index');
 
     const userPrompt = interpolatePrompt(QUESTION_ANSWERER_PROMPT.userPromptTemplate, {
       questionText: question.text,
@@ -216,7 +215,6 @@ class MessageRouter {
 
     if (!profile || !job) throw new Error('Profile or job not found');
 
-    const { COVER_LETTER_PROMPT, interpolatePrompt } = await import('../ai/prompts/index');
     const activeResume = profile.resumes.find(r => r.id === profile.activeResumeId);
 
     const userPrompt = interpolatePrompt(COVER_LETTER_PROMPT.userPromptTemplate, {
@@ -266,8 +264,6 @@ class MessageRouter {
     }
 
     if (!resume) throw new Error('Resume not found');
-
-    const { JOB_MATCHER_PROMPT, interpolatePrompt } = await import('../ai/prompts/index');
 
     const resumeSummary = [
       `Name: ${resume.contact.fullName}`,
