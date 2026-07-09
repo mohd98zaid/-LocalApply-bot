@@ -50,8 +50,9 @@ export default function PopupApp() {
       case 'linkedin': 
         url = query ? `https://www.linkedin.com/jobs/search/?keywords=${query}` : 'https://www.linkedin.com/jobs/'; 
         break;
-      case 'naukri': 
-        url = query ? `https://www.naukri.com/${query.replace(/%20/g, '-')}-jobs` : 'https://www.naukri.com/'; 
+      case 'naukri':
+        // ponytail: Naukri uses dashes, not encoded query — use raw title
+        url = searchJobTitle ? `https://www.naukri.com/${searchJobTitle.replace(/\s+/g, '-')}-jobs` : 'https://www.naukri.com/';
         break;
       case 'indeed': 
         url = query ? `https://www.indeed.com/jobs?q=${query}` : 'https://www.indeed.com/'; 

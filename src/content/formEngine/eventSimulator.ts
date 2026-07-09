@@ -4,16 +4,23 @@
 // ============================================================
 
 import type { FormField, FillResult, UploadResult } from '../../types/adapter';
+import { sleep } from '../../utils/shared';
 
 export class EventSimulator {
 
   // ---- Field Filling ----
 
   static async fillField(field: FormField, value: string): Promise<FillResult> {
-    const element = field.element ?? document.querySelector(field.elementSelector ?? '');
+    // Try to resolve element — may have been lost during message passing
+    let element: HTMLElement | undefined = field.element;
+    if (!element && field.elementSelector) {
+      try {
+        element = document.querySelector<HTMLElement>(field.elementSelector) ?? undefined;
+      } catch { /* invalid selector */ }
+    }
 
     if (!element) {
-      return { fieldId: field.id, success: false, error: 'Element not found', method: 'direct' };
+      return { fieldId: field.id, success: false, error: `Element not found: ${field.elementSelector ?? 'no selector'}`, method: 'direct' };
     }
 
     try {
@@ -41,8 +48,13 @@ export class EventSimulator {
   }
 
   static async selectOption(field: FormField, value: string): Promise<FillResult> {
-    const element = (field.element ?? document.querySelector(field.elementSelector ?? '')) as HTMLSelectElement;
-    if (!element) return { fieldId: field.id, success: false, error: 'Element not found', method: 'select' };
+    let element: HTMLSelectElement | undefined = field.element as HTMLSelectElement | undefined;
+    if (!element && field.elementSelector) {
+      try {
+        element = document.querySelector<HTMLSelectElement>(field.elementSelector) ?? undefined;
+      } catch { /* invalid selector */ }
+    }
+    if (!element) return { fieldId: field.id, success: false, error: `Select element not found: ${field.elementSelector ?? 'no selector'}`, method: 'select' };
 
     // Find matching option by text or value (case-insensitive)
     const options = Array.from(element.options);
@@ -57,7 +69,11 @@ export class EventSimulator {
     }
 
     element.focus();
-    element.value = match.value;
+    // ponytail: Native setter for React-controlled selects — direct assignment is ignored
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    if (setter) setter.call(element, match.value);
+    else element.value = match.value;
+    this.dispatch(element, 'input');
     this.dispatch(element, 'change');
     this.dispatch(element, 'blur');
 
@@ -65,8 +81,13 @@ export class EventSimulator {
   }
 
   static async uploadFile(field: FormField, file: File): Promise<UploadResult> {
-    const element = (field.element ?? document.querySelector(field.elementSelector ?? '')) as HTMLInputElement;
-    if (!element) return { fieldId: field.id, success: false, error: 'Element not found' };
+    let element: HTMLInputElement | undefined = field.element as HTMLInputElement | undefined;
+    if (!element && field.elementSelector) {
+      try {
+        element = document.querySelector<HTMLInputElement>(field.elementSelector) ?? undefined;
+      } catch { /* invalid selector */ }
+    }
+    if (!element) return { fieldId: field.id, success: false, error: `File input not found: ${field.elementSelector ?? 'no selector'}` };
 
     try {
       const dataTransfer = new DataTransfer();
@@ -103,42 +124,22 @@ export class EventSimulator {
     this.dispatch(element, 'click');
     await sleep(50);
 
-    // Clear existing value
-    if (element.value) {
-      element.select();
-      this.dispatchKeyboard(element, 'keydown', 'a', { ctrlKey: true });
-      await sleep(30);
-      this.dispatchKeyboard(element, 'keydown', 'Delete');
-      element.value = '';
-      this.dispatch(element, 'input');
-      await sleep(50);
+    // ponytail: Use the actual element's prototype, not hardcoded HTMLInputElement.
+    // Airtable/React forms ignore setters from the wrong prototype chain.
+    const proto = Object.getPrototypeOf(element);
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
+      ?? Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      ?? Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+
+    // One-shot value set — char-by-char is slow and React batches ignore intermediate states
+    if (nativeSetter) {
+      nativeSetter.call(element, value);
+    } else {
+      element.value = value;
     }
 
-    // Type character by character for human-like input
-    for (const char of value) {
-      this.dispatchKeyboard(element, 'keydown', char);
-      this.dispatchKeyboard(element, 'keypress', char);
-
-      // Use React-compatible value setter
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype, 'value'
-      )?.set ?? Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype, 'value'
-      )?.set;
-
-      if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(element, element.value + char);
-      } else {
-        element.value += char;
-      }
-
-      this.dispatch(element, 'input');
-      this.dispatchKeyboard(element, 'keyup', char);
-
-      // Random delay between characters
-      await sleep(randomBetween(20, 80));
-    }
-
+    // React captures input events to sync state — must dispatch after value is set
+    this.dispatch(element, 'input');
     this.dispatch(element, 'change');
     this.dispatch(element, 'blur');
 
@@ -158,16 +159,21 @@ export class EventSimulator {
     if (!match) return { fieldId: field.id, success: false, error: `No radio matching "${value}"`, method: 'click' };
 
     match.focus();
+    this.dispatch(match, 'click');
     match.checked = true;
     this.dispatch(match, 'change');
-    this.dispatch(match, 'click');
 
     return { fieldId: field.id, success: true, value, method: 'click' };
   }
 
   private static toggleCheckbox(field: FormField, value: string): FillResult {
-    const el = (field.element ?? document.querySelector(field.elementSelector ?? '')) as HTMLInputElement;
-    if (!el) return { fieldId: field.id, success: false, error: 'Element not found', method: 'click' };
+    let el: HTMLInputElement | undefined = field.element as HTMLInputElement | undefined;
+    if (!el && field.elementSelector) {
+      try {
+        el = document.querySelector<HTMLInputElement>(field.elementSelector) ?? undefined;
+      } catch { /* invalid selector */ }
+    }
+    if (!el) return { fieldId: field.id, success: false, error: `Checkbox element not found: ${field.elementSelector ?? 'no selector'}`, method: 'click' };
 
     const shouldCheck = ['true', 'yes', '1', 'checked'].includes(value.toLowerCase());
     if (el.checked !== shouldCheck) {
@@ -183,22 +189,4 @@ export class EventSimulator {
   private static dispatch(element: HTMLElement, event: string, options: EventInit = {}) {
     element.dispatchEvent(new Event(event, { bubbles: true, cancelable: true, ...options }));
   }
-
-  private static dispatchKeyboard(element: HTMLElement, event: string, key: string, modifiers: KeyboardEventInit = {}) {
-    element.dispatchEvent(new KeyboardEvent(event, {
-      key,
-      code: `Key${key.toUpperCase()}`,
-      bubbles: true,
-      cancelable: true,
-      ...modifiers,
-    }));
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function randomBetween(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
 }

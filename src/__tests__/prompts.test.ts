@@ -34,9 +34,9 @@ describe('interpolatePrompt', () => {
 });
 
 describe('PROMPT_REGISTRY', () => {
-  it('contains all 10 expected prompts', () => {
+  it('contains all 12 expected prompts', () => {
     const keys = Object.keys(PROMPT_REGISTRY);
-    expect(keys).toHaveLength(10);
+    expect(keys).toHaveLength(12);
   });
 
   it('each prompt has required fields', () => {

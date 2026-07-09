@@ -60,7 +60,16 @@ export abstract class BaseATSAdapter implements ATSAdapter {
 
     for (const input of inputs) {
       const field = this.buildFormField(input);
-      if (field) fields.push(field);
+      if (field) {
+        // Auto-map fields using heuristic label matching
+        if (!field.mappedProfileField) {
+          field.mappedProfileField = this.mapFieldByLabel(field.label);
+          if (field.mappedProfileField) {
+            field.confidence = 0.8;
+          }
+        }
+        fields.push(field);
+      }
     }
 
     return fields;
@@ -205,6 +214,49 @@ export abstract class BaseATSAdapter implements ATSAdapter {
 
   // ---- Shared Utilities ----
 
+  protected mapFieldByLabel(label: string): string {
+    const lower = label.toLowerCase().replace(/[*:]/g, '').trim();
+
+    // Contact info
+    if (/^first.?name$/.test(lower)) return 'contact.firstName';
+    if (/^last.?name$/.test(lower)) return 'contact.lastName';
+    if (/^full.?name$|^name$/.test(lower)) return 'contact.fullName';
+    if (/^e-?mail$|^email.?address$/.test(lower)) return 'contact.email';
+    if (/^phone$|^mobile$|^telephone$|^cell.?phone$/.test(lower)) return 'contact.phone';
+    if (/^city$/.test(lower)) return 'contact.location.city';
+    if (/^state$|^province$/.test(lower)) return 'contact.location.state';
+    if (/^country$/.test(lower)) return 'contact.location.country';
+    if (/^zip.?code$|^postal.?code$|^pin.?code$/.test(lower)) return 'contact.location.zipCode';
+    if (/^linkedin$|^linkedin.?url$|^linkedin.?profile$/.test(lower)) return 'contact.linkedin';
+    if (/^github$|^github.?url$/.test(lower)) return 'contact.github';
+    if (/^website$|^portfolio$|^personal.?website$/.test(lower)) return 'contact.portfolio';
+    if (/^address$|^street.?address$/.test(lower)) return 'contact.location.city';
+
+    // Work preferences
+    if (/^salary$|^compensation$|^pay.?expectation$|^desired.?salary$|^expected.?salary$/.test(lower)) return 'workPreferences.salaryExpectation.max';
+    if (/^notice.?period$/.test(lower)) return 'workPreferences.noticePeriod';
+    if (/^work.?authorization$|^authorized.?to.?work$|^right.?to.?work$/.test(lower)) return 'workPreferences.workAuthorization';
+    if (/^willing.?to.?relocate$|^relocation$/.test(lower)) return 'workPreferences.willingToRelocate';
+    if (/^visa.?sponsorship$|^require.?visa$|^visa.?required$/.test(lower)) return 'workPreferences.requiresVisaSponsorship';
+    if (/^start.?date$|^available.?date$|^earliest.?start$/.test(lower)) return 'workPreferences.noticePeriod';
+    if (/^remote$|^work.?from.?home$|^remote.?preference$/.test(lower)) return 'workPreferences.remotePreference';
+
+    // Experience
+    if (/^years?.?of.?experience$|^total.?experience$|^experience.?years$/.test(lower)) return 'experience.yearsTotal';
+    if (/^job.?title$|^position$|^title$|^current.?title$|^current.?role$/.test(lower)) return 'experience.currentTitle';
+    if (/^company$|^company.?name$|^employer$|^current.?employer$/.test(lower)) return 'experience.currentCompany';
+
+    // Education
+    if (/^degree$|^highest.?degree$|^education.?level$/.test(lower)) return 'education.degree';
+    if (/^university$|^school$|^institution$|^institution\/organization$|^college$/.test(lower)) return 'education.institution';
+    if (/^gpa$|^grade/.test(lower)) return 'education.gpa';
+
+    // Skills
+    if (/^skills?$|^technical.?skills$|^key.?skills$/.test(lower)) return 'skills';
+
+    return '';
+  }
+
   protected buildFormField(element: HTMLElement): FormField | null {
     const input = element as HTMLInputElement;
     const label = this.getLabelForElement(element);
@@ -299,18 +351,18 @@ export abstract class BaseATSAdapter implements ATSAdapter {
   }
 
   protected generateSelector(element: HTMLElement): string {
-    if (element.id) return `#${element.id}`;
+    if (element.id) return `#${CSS.escape(element.id)}`;
 
     const name = (element as HTMLInputElement).name;
-    if (name) return `[name="${name}"]`;
+    if (name) return `[name="${CSS.escape(name)}"]`;
 
-    // Build path selector
+    // ponytail: Take 3 classes for better specificity, escape all CSS special chars
     const path: string[] = [];
     let el: HTMLElement | null = element;
     while (el && el !== document.body) {
       let selector = el.tagName.toLowerCase();
       if (el.className) {
-        const classes = Array.from(el.classList).slice(0, 2).join('.');
+        const classes = Array.from(el.classList).slice(0, 3).map(c => CSS.escape(c)).join('.');
         if (classes) selector += `.${classes}`;
       }
       path.unshift(selector);

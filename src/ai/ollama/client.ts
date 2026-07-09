@@ -243,7 +243,7 @@ export class OllamaClient {
     const raw = await this.generate(jsonRequest);
 
     // Extract JSON from response (sometimes models wrap it in markdown)
-    const jsonMatch = raw.match(/```json\n?([\s\S]*?)\n?```/) ?? raw.match(/({[\s\S]*})/);
+    const jsonMatch = raw.match(/```json\n?([\s\S]*?)\n?```/) ?? raw.match(/(\{[\s\S]*\})/);
     const jsonStr = jsonMatch ? (jsonMatch[1] ?? raw) : raw;
 
     return JSON.parse(jsonStr.trim()) as T;

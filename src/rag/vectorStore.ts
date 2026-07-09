@@ -9,94 +9,61 @@
 
 import { embeddingsDB, memoryDB } from '../storage/indexedDB';
 import type { MemoryEntry, EmbeddingRecord, RAGQuery, RAGResult, MemoryType } from '../types/ai';
+import { HNSWIndex } from './hnsw';
 
-// ---- Cosine Similarity ----
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-
-  const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  return denom === 0 ? 0 : dot / denom;
-}
-
-// ---- In-memory index (loaded from IndexedDB) ----
-
-interface IndexedVector {
-  embeddingId: string;
-  memoryEntryId: string;
-  vector: number[];
-  type: string;
-}
+// ponytail: Map from memoryEntryId to embeddingId for removal
+const entryToEmbedding = new Map<string, string>();
 
 class VectorIndex {
-  private vectors: IndexedVector[] = [];
+  private hnsw = new HNSWIndex(16, 100);
   private loaded = false;
 
   async load(): Promise<void> {
     if (this.loaded) return;
     const embeddings = await embeddingsDB.getAll();
-    this.vectors = embeddings.map(e => ({
-      embeddingId: e.id,
-      memoryEntryId: e.memoryEntryId,
-      vector: e.vector,
-      type: '',
-    }));
+    for (const e of embeddings) {
+      if (!e.vector || e.vector.length === 0) continue;
+      this.hnsw.add(e.memoryEntryId, e.vector);
+      entryToEmbedding.set(e.memoryEntryId, e.id);
+    }
     this.loaded = true;
   }
 
   async addVector(embedding: EmbeddingRecord): Promise<void> {
-    this.vectors.push({
-      embeddingId: embedding.id,
-      memoryEntryId: embedding.memoryEntryId,
-      vector: embedding.vector,
-      type: '',
-    });
+    if (!embedding.vector || embedding.vector.length === 0) return;
+    this.hnsw.add(embedding.memoryEntryId, embedding.vector);
+    entryToEmbedding.set(embedding.memoryEntryId, embedding.id);
   }
 
   removeByMemoryId(memoryEntryId: string): void {
-    this.vectors = this.vectors.filter(v => v.memoryEntryId !== memoryEntryId);
+    this.hnsw.remove(memoryEntryId);
+    entryToEmbedding.delete(memoryEntryId);
   }
 
   search(queryVector: number[], topK: number, minSimilarity = 0.0): { memoryEntryId: string; similarity: number }[] {
-    const scored = this.vectors
-      .map(v => ({
-        memoryEntryId: v.memoryEntryId,
-        similarity: cosineSimilarity(queryVector, v.vector),
-      }))
-      .filter(r => r.similarity >= minSimilarity)
-      .sort((a, b) => b.similarity - a.similarity);
+    // ponytail: ef = max(topK * 3, 50) gives HNSW enough candidates for accurate top-K
+    const ef = Math.max(topK * 3, 50);
+    const raw = this.hnsw.search(queryVector, topK * 2, ef);
 
-    // Deduplicate by memoryEntryId (take highest score)
     const seen = new Set<string>();
     const deduped: { memoryEntryId: string; similarity: number }[] = [];
-    for (const r of scored) {
-      if (!seen.has(r.memoryEntryId)) {
-        seen.add(r.memoryEntryId);
-        deduped.push(r);
-        if (deduped.length >= topK) break;
-      }
+    for (const r of raw) {
+      if (r.similarity < minSimilarity) continue;
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      deduped.push({ memoryEntryId: r.id, similarity: r.similarity });
+      if (deduped.length >= topK) break;
     }
 
     return deduped;
   }
 
-  get size(): number {
-    return this.vectors.length;
-  }
+  get size(): number { return this.hnsw.size; }
 
   invalidate(): void {
     this.loaded = false;
-    this.vectors = [];
+    this.hnsw.clear();
+    entryToEmbedding.clear();
   }
 }
 

@@ -342,6 +342,7 @@ function DataSection({ settings, onSave }: { settings: ExtensionSettings; onSave
     a.href = url;
     a.download = `localapply-data-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {

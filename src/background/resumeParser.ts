@@ -79,6 +79,8 @@ export async function parseResumeFile(
     rawText: text,
     source: mimeType.includes('pdf') ? 'pdf' : 'docx',
     fileName,
+    fileData: Array.from(new Uint8Array(data)), // Store original file for re-upload
+    fileMimeType: mimeType,
 
     contact: parsed.contact ?? {
       fullName: '', firstName: '', lastName: '',

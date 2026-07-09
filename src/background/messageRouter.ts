@@ -5,11 +5,12 @@
 
 import type { MessageType } from '../types/messages';
 import { getOllamaClient } from '../ai/ollama/client';
-import { getSettings, saveSettings, saveTabAnalysis } from '../storage/chromeStorage';
+import { getSettings, saveSettings, saveTabAnalysis, getTabAnalysis } from '../storage/chromeStorage';
 import { profilesDB, jobsDB, applicationsDB } from '../storage/indexedDB';
 import { parseResumeFile } from './resumeParser';
 import { autoApplyEngine } from './autoApplyEngine';
-import { QUESTION_ANSWERER_PROMPT, COVER_LETTER_PROMPT, JOB_MATCHER_PROMPT, interpolatePrompt } from '../ai/prompts/index';
+import { QUESTION_ANSWERER_PROMPT, COVER_LETTER_PROMPT, JOB_MATCHER_PROMPT, interpolatePrompt, AI_FORM_FILLER_PROMPT, AI_QUESTION_ANSWERER_V2_PROMPT } from '../ai/prompts/index';
+import { sendToContentScript } from '../utils/shared';
 
 interface MessageSender {
   tab?: chrome.tabs.Tab;
@@ -82,6 +83,10 @@ class MessageRouter {
         return profilesDB.get(profileId);
       }
 
+      case 'GET_ALL_PROFILES': {
+        return profilesDB.getAll();
+      }
+
       case 'SAVE_PROFILE': {
         const profile = payload as Parameters<typeof profilesDB.save>[0];
         await profilesDB.save(profile);
@@ -138,17 +143,28 @@ class MessageRouter {
         if (sender.tab?.id) {
           await saveTabAnalysis(sender.tab.id, payload);
           // Notify auto apply engine if running
-          autoApplyEngine.handlePageAnalysis(payload, sender.tab.id);
+          autoApplyEngine.handlePageAnalysis(payload as import('../types/messages').PageAnalysis, sender.tab.id);
         }
-        // Broadcast to side panel
-        chrome.runtime.sendMessage({ type: 'PAGE_ANALYSIS_RESULT', payload });
+        // Broadcast to side panel (may not be open)
+        chrome.runtime.sendMessage({ type: 'PAGE_ANALYSIS_RESULT', payload }).catch(() => {});
         return null;
+      }
+
+      case 'GET_PAGE_DATA': {
+        const { tabId: dataTabId } = payload as { tabId: number };
+        try {
+          const result = await sendToContentScript(dataTabId, { type: 'GET_PAGE_DATA', payload: {} });
+          return result;
+        } catch {
+          // Fallback to stored analysis
+          return await getTabAnalysis(dataTabId);
+        }
       }
 
       case 'ANALYZE_PAGE': {
         const { tabId } = payload as { tabId: number };
         // Inject content script command
-        await chrome.tabs.sendMessage(tabId, { type: 'ANALYZE_PAGE', payload: {} });
+        await sendToContentScript(tabId, { type: 'ANALYZE_PAGE', payload: {} });
         return null;
       }
 
@@ -157,20 +173,100 @@ class MessageRouter {
       case 'START_AUTOFILL': {
         const tabId = sender.tab?.id ?? (payload as { tabId?: number }).tabId;
         if (tabId) {
-          await chrome.tabs.sendMessage(tabId, { type: 'START_AUTOFILL', payload });
+          await sendToContentScript(tabId, { type: 'START_AUTOFILL', payload });
         }
         return null;
       }
 
       case 'FILL_RESULT': {
-        // Relay fill result from content script to side panel
-        chrome.runtime.sendMessage({ type: 'FILL_RESULT', payload });
+        // Relay fill result from content script to side panel (may not be open)
+        chrome.runtime.sendMessage({ type: 'FILL_RESULT', payload }).catch(() => {});
         return null;
       }
 
       case 'AUTOFILL_COMPLETE': {
-        autoApplyEngine.handleAutofillComplete(payload);
+        autoApplyEngine.handleAutofillComplete(payload as { success: boolean; reason?: string });
         return null;
+      }
+
+      case 'SAVE_FILL_TO_RAG': {
+        const { filledData, url } = payload as { filledData: { label: string; value: string; mappedField: string }[]; url: string };
+        try {
+          const { addMemory } = await import('../rag/vectorStore');
+          const content = filledData
+            .map(f => `${f.label}: ${f.value} (mapped to ${f.mappedField})`)
+            .join('\n');
+          await addMemory(
+            content,
+            'application_answer',
+            {
+              source: 'autofill',
+              tags: ['form_fill', new URL(url).hostname],
+            },
+            [], // embedding vector — computed later when available
+            'none'
+          );
+        } catch (e) {
+          console.warn('[LocalApply] Failed to save fill to RAG:', e);
+        }
+        return null;
+      }
+
+      // ---- AI-Powered Form Filling ----
+
+      case 'AI_FILL_FIELD': {
+        const { label, fieldType, options, jobTitle, companyName, profileId } = payload as {
+          label: string; fieldType: string; options?: string[];
+          jobTitle: string; companyName: string; profileId: string;
+        };
+        return this.aiFillField(label, fieldType, options, jobTitle, companyName, profileId);
+      }
+
+      case 'AI_FILL_FIELDS_BATCH': {
+        const { fields, jobTitle, companyName, profileId } = payload as {
+          fields: { label: string; fieldType: string; options?: string[] }[];
+          jobTitle: string; companyName: string; profileId: string;
+        };
+        const results: { label: string; value: string; confidence: number }[] = [];
+        for (const field of fields) {
+          try {
+            const result = await this.aiFillField(field.label, field.fieldType, field.options, jobTitle, companyName, profileId);
+            results.push({ label: field.label, value: (result as { value: string; confidence: number }).value, confidence: (result as { value: string; confidence: number }).confidence });
+          } catch {
+            results.push({ label: field.label, value: '', confidence: 0 });
+          }
+        }
+        return results;
+      }
+
+      case 'AI_ANSWER_QUESTION': {
+        const { question, category, maxLength, jobTitle, companyName, profileId } = payload as {
+          question: string; category: string; maxLength?: number;
+          jobTitle: string; companyName: string; profileId: string;
+        };
+        return this.aiAnswerQuestion(question, category, maxLength, jobTitle, companyName, profileId);
+      }
+
+      // ---- Resume File & Cover Letter ----
+
+      case 'GET_RESUME_FILE': {
+        const { profileId: pid } = payload as { profileId: string };
+        const prof = await profilesDB.get(pid);
+        if (!prof) throw new Error('Profile not found');
+        const activeResume = prof.resumes.find(r => r.id === prof.activeResumeId) ?? prof.resumes[0];
+        if (!activeResume?.fileData) throw new Error('Resume file not found — re-upload your resume');
+        return {
+          fileData: activeResume.fileData,
+          mimeType: activeResume.fileMimeType ?? 'application/pdf',
+          fileName: activeResume.fileName ?? 'resume.pdf',
+        };
+      }
+
+      case 'GENERATE_COVER_LETTER_TEXT': {
+        const { profileId: clPid, jobTitle: clJobTitle, companyName: clCompany, jobDescription: clJd, tone: clTone } = payload as {
+          profileId: string; jobTitle: string; companyName: string; jobDescription?: string; tone?: string;
+        };
+        return this.generateCoverLetterText(clPid, clJobTitle, clCompany, clJd, clTone ?? 'professional');
       }
 
       // ---- Auto Apply Loop ----
@@ -208,6 +304,29 @@ class MessageRouter {
         return null;
       }
 
+      // ---- Side Panel ----
+
+      case 'OPEN_SIDE_PANEL': {
+        const targetTabId = sender.tab?.id ?? (payload as { tabId?: number })?.tabId;
+        if (targetTabId) {
+          await chrome.tabs.update(targetTabId, { active: true }).catch(() => {});
+          try {
+            await chrome.sidePanel.open({ tabId: targetTabId });
+          } catch {
+            // sidePanel.open may not be available in all contexts
+          }
+        }
+        return null;
+      }
+
+      // ---- Get stored analysis for a tab ----
+
+      case 'GET_TAB_ANALYSIS': {
+        const { tabId: reqTabId } = payload as { tabId: number };
+        const stored = await getTabAnalysis(reqTabId);
+        return stored;
+      }
+
       default:
         console.warn('[LocalApply Router] Unknown message type:', type);
         return null;
@@ -215,6 +334,180 @@ class MessageRouter {
   }
 
   // ---- AI Helpers ----
+
+  private async aiFillField(
+    label: string, fieldType: string, options: string[] | undefined,
+    jobTitle: string, companyName: string, profileId: string
+  ) {
+    const settings = await getSettings();
+    const client = getOllamaClient(settings.ai.ollamaUrl);
+
+    // Get profile for context
+    const profile = await profilesDB.get(profileId);
+    const profileSummary = profile
+      ? `${profile.personalInfo.firstName} ${profile.personalInfo.lastName}, ${profile.personalInfo.email}, ${profile.personalInfo.phone || ''}`
+      : '';
+
+    // Check RAG for similar past answers
+    let pastAnswers = '';
+    try {
+      const { memoryDB } = await import('../storage/indexedDB');
+      const memories = await memoryDB.getByType('application_answer');
+      const relevant = memories.filter(m =>
+        m.content.toLowerCase().includes(label.toLowerCase().split(' ')[0])
+      ).slice(0, 3);
+      if (relevant.length > 0) {
+        pastAnswers = relevant.map(m => m.content).join('\n');
+      }
+    } catch { /* RAG not available */ }
+
+    const userPrompt = interpolatePrompt(AI_FORM_FILLER_PROMPT.userPromptTemplate, {
+      fieldLabel: label,
+      fieldType,
+      options: options?.join(', ') ?? '',
+      jobTitle,
+      companyName,
+      profileSummary,
+      pastAnswers,
+    });
+
+    const result = await client.generateJSON<{ value: string; confidence: number; reasoning: string }>({
+      model: settings.ai.primaryModel,
+      messages: [
+        { role: 'system', content: AI_FORM_FILLER_PROMPT.systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      options: {
+        temperature: AI_FORM_FILLER_PROMPT.temperature,
+        num_predict: AI_FORM_FILLER_PROMPT.maxTokens,
+      },
+    });
+
+    // Save to RAG for future reference
+    if (result.value) {
+      try {
+        const { addMemory } = await import('../rag/vectorStore');
+        await addMemory(
+          `Field: ${label} → Value: ${result.value}`,
+          'application_answer',
+          { source: 'ai_fill', tags: ['ai_fill', label.toLowerCase()] },
+          [],
+          settings.ai.primaryModel
+        );
+      } catch { /* ignore RAG save errors */ }
+    }
+
+    return result;
+  }
+
+  private async aiAnswerQuestion(
+    question: string, category: string, maxLength: number | undefined,
+    jobTitle: string, companyName: string, profileId: string
+  ) {
+    const settings = await getSettings();
+    const client = getOllamaClient(settings.ai.ollamaUrl);
+
+    const profile = await profilesDB.get(profileId);
+    const profileSummary = profile
+      ? `${profile.personalInfo.firstName} ${profile.personalInfo.lastName}, ${profile.personalInfo.email}\nExperience: ${profile.resumes[0]?.summary ?? ''}\nSkills: ${profile.resumes[0]?.skills.flatMap(s => s.skills.map(sk => sk.name)).join(', ') ?? ''}`
+      : '';
+
+    // Check RAG for similar past answers
+    let pastAnswers = '';
+    try {
+      const { memoryDB } = await import('../storage/indexedDB');
+      const memories = await memoryDB.getByType('application_answer');
+      const relevant = memories.filter(m =>
+        m.content.toLowerCase().includes(category.toLowerCase()) ||
+        m.content.toLowerCase().includes(question.toLowerCase().slice(0, 30))
+      ).slice(0, 3);
+      if (relevant.length > 0) {
+        pastAnswers = relevant.map(m => m.content).join('\n');
+      }
+    } catch { /* RAG not available */ }
+
+    const userPrompt = interpolatePrompt(AI_QUESTION_ANSWERER_V2_PROMPT.userPromptTemplate, {
+      questionText: question,
+      questionCategory: category,
+      maxLength: maxLength ? String(maxLength) : '',
+      profileSummary,
+      jobTitle,
+      companyName,
+      pastAnswers,
+    });
+
+    const result = await client.generateJSON<{ answer: string; confidence: number; reasoning: string }>({
+      model: settings.ai.primaryModel,
+      messages: [
+        { role: 'system', content: AI_QUESTION_ANSWERER_V2_PROMPT.systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      options: {
+        temperature: AI_QUESTION_ANSWERER_V2_PROMPT.temperature,
+        num_predict: AI_QUESTION_ANSWERER_V2_PROMPT.maxTokens,
+      },
+    });
+
+    // Save to RAG
+    if (result.answer) {
+      try {
+        const { addMemory } = await import('../rag/vectorStore');
+        await addMemory(
+          `Question: ${question} → Answer: ${result.answer}`,
+          'application_answer',
+          { source: 'ai_answer', tags: ['ai_answer', category] },
+          [],
+          settings.ai.primaryModel
+        );
+      } catch { /* ignore */ }
+    }
+
+    return result;
+  }
+
+  private async generateCoverLetterText(
+    profileId: string, jobTitle: string, companyName: string,
+    jobDescription: string | undefined, tone: string
+  ) {
+    const settings = await getSettings();
+    const client = getOllamaClient(settings.ai.ollamaUrl);
+    const profile = await profilesDB.get(profileId);
+    if (!profile) throw new Error('Profile not found');
+
+    const activeResume = profile.resumes.find(r => r.id === profile.activeResumeId) ?? profile.resumes[0];
+
+    const userPrompt = interpolatePrompt(COVER_LETTER_PROMPT.userPromptTemplate, {
+      candidateName: `${profile.personalInfo.firstName} ${profile.personalInfo.lastName}`,
+      candidateSummary: activeResume?.summary ?? '',
+      topAchievements: activeResume?.experience
+        .slice(0, 2)
+        .flatMap(e => e.bullets.slice(0, 2))
+        .join('\n') ?? '',
+      skills: activeResume?.skills
+        .flatMap(s => s.skills.map(sk => sk.name))
+        .slice(0, 15)
+        .join(', ') ?? '',
+      jobTitle,
+      companyName,
+      requirements: jobDescription?.slice(0, 2000) ?? '',
+      companyContext: '',
+      tone,
+    });
+
+    const result = await client.generateJSON<{ coverLetter: string }>({
+      model: settings.ai.primaryModel,
+      messages: [
+        { role: 'system', content: COVER_LETTER_PROMPT.systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      options: {
+        temperature: COVER_LETTER_PROMPT.temperature,
+        num_predict: COVER_LETTER_PROMPT.maxTokens,
+      },
+    });
+
+    return { coverLetter: result.coverLetter ?? '' };
+  }
 
   private async generateAnswer(
     question: import('../types/ai').ApplicationQuestion,

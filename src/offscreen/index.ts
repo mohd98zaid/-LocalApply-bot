@@ -17,6 +17,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true; // async
 });
 
+// ponytail: 30s timeout prevents corrupted files from hanging the offscreen document
+const PARSE_TIMEOUT_MS = 30_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
+
 async function handleOffscreenMessage(message: {
   type: string;
   payload: { data: number[]; type: string; fileName: string };
@@ -28,14 +41,14 @@ async function handleOffscreenMessage(message: {
     const buffer = new Uint8Array(data).buffer;
 
     if (mimeType === 'application/pdf' || fileName.endsWith('.pdf')) {
-      return parseResumeWithPdfjs(buffer, fileName);
+      return withTimeout(parseResumeWithPdfjs(buffer, fileName), PARSE_TIMEOUT_MS, 'PDF parse');
     }
 
     if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       fileName.endsWith('.docx')
     ) {
-      return parseResumeWithMammoth(buffer, fileName);
+      return withTimeout(parseResumeWithMammoth(buffer, fileName), PARSE_TIMEOUT_MS, 'DOCX parse');
     }
 
     throw new Error(`Unsupported file type: ${mimeType}`);

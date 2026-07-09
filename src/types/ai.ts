@@ -13,7 +13,9 @@ export type AITask =
   | 'skill_extract'
   | 'company_summarize'
   | 'field_classify'
-  | 'application_score';
+  | 'application_score'
+  | 'form_fill'
+  | 'question_answer_v2';
 
 export interface AIPrompt {
   id: string;

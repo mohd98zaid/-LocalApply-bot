@@ -124,6 +124,8 @@ export interface ParsedResume {
   rawText: string;
   source: 'pdf' | 'docx' | 'markdown' | 'manual';
   fileName?: string;
+  fileData?: number[]; // Original file binary (stored for re-upload)
+  fileMimeType?: string; // MIME type of the original file
 
   contact: {
     fullName: string;

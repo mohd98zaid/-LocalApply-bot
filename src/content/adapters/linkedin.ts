@@ -18,14 +18,26 @@ export class LinkedInAdapter extends BaseATSAdapter {
     const isLinkedIn = url.includes('linkedin.com');
     if (!isLinkedIn) return { detected: false, atsName: 'linkedin', confidence: 0, pageType: 'unknown', metadata: {} };
 
-    // Easy Apply modal (indicates application form is OPEN)
-    const isAppForm = !!doc.querySelector('.jobs-easy-apply-modal');
-    
+    // Easy Apply modal — multiple selector strategies
+    const isAppForm = !!(
+      doc.querySelector('.jobs-easy-apply-modal') ||
+      doc.querySelector('.artdeco-modal__content') ||
+      doc.querySelector('[data-test="jobs-apply-button-modal"]') ||
+      doc.querySelector('div[role="dialog"] form') ||
+      doc.querySelector('.jobs-easy-apply-content')
+    );
+
     // Search results page
     const isSearchPage = url.includes('/jobs/search/') && !isAppForm;
-    
-    // Job listing (can be /view/ or /search/ with a selected job)
-    const isJobPage = url.includes('/jobs/view/') || (url.includes('/jobs/search/') && !!doc.querySelector('.job-view-layout, .jobs-search__job-details--container, .job-details-jobs-unified-top-card__job-title'));
+
+    // Job listing
+    const isJobPage = url.includes('/jobs/view/') ||
+      (url.includes('/jobs/search/') && !!(
+        doc.querySelector('.job-view-layout') ||
+        doc.querySelector('.jobs-search__job-details--container') ||
+        doc.querySelector('.job-details-jobs-unified-top-card__job-title') ||
+        doc.querySelector('[data-test="job-details"]')
+      ));
 
     return {
       detected: isLinkedIn,
@@ -81,12 +93,14 @@ export class LinkedInAdapter extends BaseATSAdapter {
   }
 
   async parseFormFields(doc: Document): Promise<FormField[]> {
-    const modal = doc.querySelector('.jobs-easy-apply-modal, .artdeco-modal__content');
+    const modal = doc.querySelector(
+      '.jobs-easy-apply-modal, .artdeco-modal__content, div[role="dialog"], .jobs-easy-apply-content'
+    );
     const container = modal ?? doc;
 
     const fields: FormField[] = [];
     const inputs = container.querySelectorAll<HTMLElement>(
-      'input:not([type="hidden"]):not([type="submit"]), select, textarea'
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]), select, textarea'
     );
 
     for (const input of inputs) {

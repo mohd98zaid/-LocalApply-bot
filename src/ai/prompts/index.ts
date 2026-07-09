@@ -455,6 +455,102 @@ Return JSON:
 }`,
 };
 
+// ---- AI Form Filler ----
+export const AI_FORM_FILLER_PROMPT: AIPrompt = {
+  id: 'ai-form-filler-v1',
+  name: 'AI Form Filler',
+  task: 'form_fill',
+  temperature: 0.3,
+  maxTokens: 500,
+  version: 1,
+  systemPrompt: `You are a job application assistant. Generate concise, professional answers for form fields.
+
+RULES:
+- Base ALL answers on the candidate's resume and profile data ONLY
+- Never fabricate experience, skills, or qualifications not in the profile
+- For salary/compensation questions: use the candidate's stated preference, or a reasonable market rate if not specified
+- For yes/no questions: answer clearly
+- For dropdown options: pick the closest match from the available options
+- Keep answers short and direct — form fields have limited space
+- Use the same terminology the candidate uses in their resume
+- For "notice period" or "available date": use the candidate's stated preference, or "Immediately" if not specified
+- For work authorization: use the candidate's actual status from profile, or "Yes" if not specified
+- For numeric fields (experience in months/years): convert from the resume data`,
+
+  userPromptTemplate: `Fill this job application field.
+
+<field>
+Label: {{fieldLabel}}
+Type: {{fieldType}}
+Options: {{options}}
+</field>
+
+<job>
+Title: {{jobTitle}}
+Company: {{companyName}}
+</job>
+
+<candidate>
+{{profileSummary}}
+</candidate>
+
+{{pastAnswers}}
+
+Return JSON:
+{
+  "value": "the value to fill",
+  "confidence": 0.0,
+  "reasoning": "why this value"
+}`,
+};
+
+// ---- AI Question Answerer (for textareas / long-form) ----
+export const AI_QUESTION_ANSWERER_V2_PROMPT: AIPrompt = {
+  id: 'ai-question-answerer-v2',
+  name: 'AI Question Answerer V2',
+  task: 'question_answer_v2',
+  temperature: 0.65,
+  maxTokens: 800,
+  version: 1,
+  systemPrompt: `You are a job application assistant. Generate personalized answers for application questions.
+
+RULES:
+- Base ALL answers on the candidate's resume and profile data ONLY
+- Never fabricate experience, skills, or qualifications not in the profile
+- For behavioral questions: use STAR method (Situation, Task, Action, Result)
+- For salary questions: use the candidate's stated preference
+- For yes/no questions: answer clearly first, then briefly elaborate
+- Respect character/word limits strictly
+- Be specific and avoid generic corporate language
+- Draw on the most relevant experience for each question`,
+
+  userPromptTemplate: `Answer this job application question.
+
+<question>
+{{questionText}}
+</question>
+
+Question type: {{questionCategory}}
+Max characters: {{maxLength}}
+
+<candidate>
+{{profileSummary}}
+</candidate>
+
+<job>
+Title: {{jobTitle}} at {{companyName}}
+</job>
+
+{{pastAnswers}}
+
+Return JSON:
+{
+  "answer": "",
+  "confidence": 0.0,
+  "reasoning": ""
+}`,
+};
+
 // ---- Prompt Registry ----
 export const PROMPT_REGISTRY: Record<string, AIPrompt> = {
   [RESUME_PARSER_PROMPT.id]: RESUME_PARSER_PROMPT,
@@ -467,6 +563,8 @@ export const PROMPT_REGISTRY: Record<string, AIPrompt> = {
   [COMPANY_SUMMARIZER_PROMPT.id]: COMPANY_SUMMARIZER_PROMPT,
   [APPLICATION_SCORER_PROMPT.id]: APPLICATION_SCORER_PROMPT,
   [FIELD_CLASSIFIER_PROMPT.id]: FIELD_CLASSIFIER_PROMPT,
+  [AI_FORM_FILLER_PROMPT.id]: AI_FORM_FILLER_PROMPT,
+  [AI_QUESTION_ANSWERER_V2_PROMPT.id]: AI_QUESTION_ANSWERER_V2_PROMPT,
 };
 
 // Template variable interpolation
@@ -478,6 +576,6 @@ export function interpolatePrompt(template: string, vars: Record<string, string 
       }
       return undefined;
     }, vars as unknown);
-    return value !== undefined && value !== null ? String(value) : `[${key}]`;
+    return value !== undefined && value !== null ? String(value) : '';
   });
 }

@@ -10,8 +10,8 @@
     "sidePanel",
     "offscreen",
     "scripting",
-    "tabs",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "alarms"
   ],
 
   "optional_permissions": [
@@ -41,22 +41,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.linkedin.com/jobs/*",
-        "*://*.indeed.com/*",
-        "*://boards.greenhouse.io/*",
-        "*://*.greenhouse.io/*",
-        "*://jobs.lever.co/*",
-        "*://*.lever.co/*",
-        "*://*.myworkdayjobs.com/*",
-        "*://*.wd5.myworkdayjobs.com/*",
-        "*://*.ashbyhq.com/*",
-        "*://*.bamboohr.com/careers/*",
-        "*://jobs.smartrecruiters.com/*",
-        "*://*.smartrecruiters.com/*",
-        "*://*.jobvite.com/*",
-        "*://wellfound.com/jobs/*",
-        "*://wellfound.com/l/2/*",
-        "*://*.naukri.com/*"
+        "<all_urls>"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle",
@@ -82,7 +67,7 @@
   "options_page": "options.html",
 
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; connect-src http://localhost:11434 http://127.0.0.1:11434; object-src 'none'"
+    "extension_pages": "script-src 'self'; connect-src http://localhost:11434 http://127.0.0.1:11434; object-src 'none'"
   },
 
   "icons": {
@@ -94,7 +79,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["assets/*"],
+      "resources": ["assets/icons/*"],
       "matches": ["<all_urls>"]
     }
   ]

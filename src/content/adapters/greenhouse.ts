@@ -400,58 +400,129 @@ export class UniversalAdapter extends BaseATSAdapter {
   readonly supportedDomains = ['*'];
 
   async detect(doc: Document): Promise<ATSDetectionResult> {
-    const hasForm = !!doc.querySelector('form');
-    const hasJobTitle = !!(
-      doc.querySelector('h1') &&
-      (doc.title.toLowerCase().includes('job') ||
-       doc.title.toLowerCase().includes('position') ||
-       doc.title.toLowerCase().includes('career') ||
-       window.location.href.includes('/job') ||
-       window.location.href.includes('/career'))
+    const url = window.location.href;
+    const urlLower = url.toLowerCase();
+
+    // Check for form elements (input, select, textarea) — works even without <form> tag
+    const hasFormElements = doc.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea').length > 0;
+
+    // Check for <form> tag
+    const hasFormTag = !!doc.querySelector('form');
+
+    // Check URL for job/application/career keywords (flexible matching)
+    const hasJobUrl = (
+      urlLower.includes('/job') ||
+      urlLower.includes('/career') ||
+      urlLower.includes('/apply') ||
+      urlLower.includes('/application') ||
+      urlLower.includes('/form') ||
+      urlLower.includes('jobid=') ||
+      urlLower.includes('job_id=')
     );
 
-    const isSearchPage = window.location.href.includes('/search') || window.location.href.includes('-jobs');
+    // Check page title for job-related keywords
+    const titleLower = doc.title.toLowerCase();
+    const hasJobTitle = (
+      titleLower.includes('job') ||
+      titleLower.includes('position') ||
+      titleLower.includes('career') ||
+      titleLower.includes('apply') ||
+      titleLower.includes('application') ||
+      titleLower.includes('additional information')
+    );
+
+    // Check for step indicators (multi-step forms)
+    const hasStepIndicator = !!(
+      doc.querySelector('[class*="step"]') ||
+      doc.querySelector('[class*="progress"]') ||
+      doc.querySelector('[aria-label*="step"]') ||
+      doc.querySelector('ol li') // ordered list often used for wizard steps
+    );
+
+    const isSearchPage = urlLower.includes('/search') || urlLower.includes('-jobs');
+
+    // Check if URL/title explicitly indicate an application form
+    const urlOrTitleSaysForm = (
+      urlLower.includes('/application') || urlLower.includes('/form') ||
+      titleLower.includes('application') || titleLower.includes('apply') || titleLower.includes('form')
+    );
+
+    // Determine page type
+    let pageType: ATSDetectionResult['pageType'] = 'unknown';
+    if (isSearchPage) {
+      pageType = 'search_results';
+    } else if (hasFormElements || hasFormTag || urlOrTitleSaysForm) {
+      // Form elements, <form> tag, or URL/title says "application/form" → it's an application form
+      pageType = 'application_form';
+    } else if (hasJobUrl || hasJobTitle || hasStepIndicator) {
+      pageType = 'job_listing';
+    }
+
+    const detected = hasFormElements || hasFormTag || hasJobUrl || hasJobTitle || hasStepIndicator;
+    const confidence = pageType === 'application_form' ? 0.7
+      : pageType === 'job_listing' ? 0.5
+      : pageType === 'search_results' ? 0.6
+      : 0.2;
 
     return {
-      detected: hasJobTitle || isSearchPage,
+      detected,
       atsName: 'universal',
-      confidence: isSearchPage ? 0.6 : hasForm && hasJobTitle ? 0.5 : 0.3,
-      pageType: isSearchPage ? 'search_results' : hasForm ? 'application_form' : hasJobTitle ? 'job_listing' : 'unknown',
-      metadata: { detected: 'universal', url: window.location.href },
+      confidence,
+      pageType,
+      metadata: { detected: 'universal', url },
     };
   }
 
-  // Uses AI-powered field classification — dispatches to background
   async parseFormFields(doc: Document): Promise<FormField[]> {
-    const baseFields = await super.parseFormFields(doc);
+    const fields = await super.parseFormFields(doc);
 
-    // For each unmapped field, request AI classification via background
-    const unmapped = baseFields.filter(f => !f.mappedProfileField);
-    if (unmapped.length === 0) return baseFields;
-
-    try {
-      for (const field of unmapped) {
-        let response = null;
-        try {
-          response = await chrome.runtime.sendMessage({
-            type: 'CLASSIFY_FIELD',
-            payload: {
-              label: field.label,
-              placeholder: field.placeholder,
-              fieldType: field.type,
-              options: field.options,
-              surroundingHTML: field.element?.closest('[class], [id]')?.outerHTML?.slice(0, 500),
-            },
-          }).catch(() => null);
-        } catch (e) {}
-
-        if (response?.success && response.data?.mappedField) {
-          field.mappedProfileField = response.data.mappedField;
-          field.confidence = response.data.confidence ?? 0.5;
-        }
+    // Map fields based on common label patterns
+    for (const field of fields) {
+      if (!field.mappedProfileField) {
+        field.mappedProfileField = this.mapUniversalField(field);
       }
-    } catch { /* AI unavailable — leave unmapped */ }
+    }
 
-    return baseFields;
+    return fields;
+  }
+
+  private mapUniversalField(field: FormField): string {
+    const label = field.label.toLowerCase();
+    const placeholder = (field.placeholder ?? '').toLowerCase();
+
+    // Use both label and placeholder for matching
+    const text = `${label} ${placeholder}`;
+
+    // Personal info
+    if (/first.?name/.test(text)) return 'contact.firstName';
+    if (/last.?name|surname|family.?name/.test(text)) return 'contact.lastName';
+    if (/full.?name|your.?name|^name$/.test(text) && !/company/.test(text)) return 'contact.fullName';
+    if (/email|e-?mail/.test(text)) return 'contact.email';
+    if (/phone|mobile|cell|tel/.test(text)) return 'contact.phone';
+
+    // Location
+    if (/address|street|address.?line/.test(text)) return 'contact.location.street';
+    if (/city|town/.test(text)) return 'contact.location.city';
+    if (/state|province|region/.test(text)) return 'contact.location.state';
+    if (/zip|postal|pin.?code/.test(text)) return 'contact.location.zipCode';
+    if (/country/.test(text)) return 'contact.location.country';
+
+    // Professional
+    if (/linkedin/.test(text)) return 'contact.linkedin';
+    if (/github/.test(text)) return 'contact.github';
+    if (/portfolio|website|url/.test(text) && !/linkedin/.test(text)) return 'contact.portfolio';
+
+    // Work preferences
+    if (/salary|compensation|pay|expectation/.test(text)) return 'workPreferences.salaryExpectation';
+    if (/notice.?period|available|start.?date/.test(text)) return 'workPreferences.noticePeriod';
+    if (/visa|sponsorship|work.?authoriz|authorized/.test(text)) return 'workPreferences.workAuthorization';
+
+    // File uploads
+    if (field.type === 'file') {
+      if (/resume|cv/.test(text)) return 'RESUME_UPLOAD';
+      if (/cover/.test(text)) return 'COVER_LETTER';
+    }
+
+    return '';
   }
 }

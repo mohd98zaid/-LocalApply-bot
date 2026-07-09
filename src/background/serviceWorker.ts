@@ -49,7 +49,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'PARSE_RESUME_FILE') {
     return false;
   }
-  messageRouter.handle(message, sender, sendResponse);
+
+  // Handle async response — catch sync throws to prevent channel hang
+  try {
+    messageRouter.handle(message, sender, sendResponse).catch(err => {
+      sendResponse({ success: false, error: String(err) });
+    });
+  } catch (err) {
+    sendResponse({ success: false, error: String(err) });
+  }
+
   return true; // Keep channel open for async responses
 });
 
@@ -62,25 +71,20 @@ chrome.sidePanel
 
 // ---- Tab Events ----
 
+// Domains where we show the badge (cosmetic — content script runs everywhere via <all_urls>)
+const BADGE_DOMAINS = [
+  'linkedin.com', 'indeed.com', 'greenhouse.io', 'lever.co',
+  'myworkdayjobs.com', 'ashbyhq.com', 'bamboohr.com',
+  'smartrecruiters.com', 'jobvite.com', 'wellfound.com', 'naukri.com',
+  'workday.com', 'icims.com', 'taleo.net', 'successfactors.com',
+];
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete' || !tab.url) return;
 
-  // Update badge if on a supported job site
-  const supportedSites = [
-    'linkedin.com/jobs',
-    'indeed.com',
-    'greenhouse.io',
-    'lever.co',
-    'myworkdayjobs.com',
-    'ashbyhq.com',
-    'bamboohr.com',
-    'smartrecruiters.com',
-    'jobvite.com',
-    'wellfound.com',
-    'naukri.com',
-  ];
+  const url = tab.url;
+  const isJobSite = BADGE_DOMAINS.some(d => url.includes(d));
 
-  const isJobSite = supportedSites.some(site => tab.url!.includes(site));
   if (isJobSite) {
     await setBadge('✓', '#6366f1');
   } else {
@@ -95,28 +99,29 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 
 // ---- Periodic Ollama Health Check ----
 
-let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+const HEALTH_CHECK_ALARM = 'ollama-health-check';
 
-async function startHealthCheck() {
-  const settings = await getSettings();
-  const client = getOllamaClient(settings.ai.ollamaUrl);
-
-  // Broadcast status
-  async function checkAndBroadcast() {
+async function runHealthCheck() {
+  try {
+    const settings = await getSettings();
+    const client = getOllamaClient(settings.ai.ollamaUrl);
     const status = await client.getStatus();
-    // Store in session for quick access
     await storageSet('ollama_status', status, 'session');
+  } catch (e) {
+    console.warn('[LocalApply] Health check failed:', e);
   }
-
-  await checkAndBroadcast();
-
-  // Check every 30 seconds
-  if (healthCheckInterval) clearInterval(healthCheckInterval);
-  healthCheckInterval = setInterval(checkAndBroadcast, 30000);
 }
 
-// Start health check when SW wakes up
-startHealthCheck().catch(console.error);
+// Use chrome.alarms instead of setInterval — survives SW sleep
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === HEALTH_CHECK_ALARM) {
+    runHealthCheck();
+  }
+});
+
+// ponytail: Always create alarm — if health check fails, we still want periodic retries
+chrome.alarms.create(HEALTH_CHECK_ALARM, { periodInMinutes: 1 });
+runHealthCheck().catch(console.error);
 
 // Keep Service Worker alive during streaming (MV3 workaround)
 chrome.runtime.onConnect.addListener((port) => {

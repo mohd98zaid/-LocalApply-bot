@@ -293,70 +293,83 @@ function Field({ label, children, flex = 1 }: { label: string; children: React.R
 // ---- Personal Info Tab ----
 function PersonalInfoTab({ profile, onSave }: { profile: CandidateProfile, onSave: (p: CandidateProfile) => void }) {
   const info = profile.personalInfo;
-  
-  const updateInfo = (updates: Partial<typeof info>) => {
-    onSave({ ...profile, personalInfo: { ...info, ...updates } });
+
+  // ponytail: Local state for inputs — save on blur, not on every keystroke
+  const [local, setLocal] = useState(info);
+  const isLocalRef = useRef(false);
+
+  // Sync when profile changes externally
+  useEffect(() => { if (!isLocalRef.current) setLocal(info); isLocalRef.current = false; }, [info]);
+
+  const updateLocal = (updates: Partial<typeof info>) => {
+    isLocalRef.current = true;
+    setLocal(prev => ({ ...prev, ...updates }));
   };
+
+  const saveField = () => {
+    onSave({ ...profile, personalInfo: local });
+  };
+
   const updateAddress = (updates: Partial<Address>) => {
-    updateInfo({ address: { ...info.address, ...updates } });
+    updateLocal({ address: { ...local.address, ...updates } });
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>Contact Information</h3>
-      
+
       <FieldRow>
         <Field label="First Name">
-          <input className="input" value={info.firstName} onChange={e => updateInfo({ firstName: e.target.value })} placeholder="Jane" />
+          <input className="input" value={local.firstName} onChange={e => updateLocal({ firstName: e.target.value })} onBlur={saveField} placeholder="Jane" />
         </Field>
         <Field label="Last Name">
-          <input className="input" value={info.lastName} onChange={e => updateInfo({ lastName: e.target.value })} placeholder="Doe" />
+          <input className="input" value={local.lastName} onChange={e => updateLocal({ lastName: e.target.value })} onBlur={saveField} placeholder="Doe" />
         </Field>
       </FieldRow>
 
       <FieldRow>
         <Field label="Email Address">
-          <input className="input" type="email" value={info.email} onChange={e => updateInfo({ email: e.target.value })} placeholder="jane.doe@example.com" />
+          <input className="input" type="email" value={local.email} onChange={e => updateLocal({ email: e.target.value })} onBlur={saveField} placeholder="jane.doe@example.com" />
         </Field>
         <Field label="Phone Number">
-          <input className="input" type="tel" value={info.phone} onChange={e => updateInfo({ phone: e.target.value })} placeholder="+1 (555) 123-4567" />
+          <input className="input" type="tel" value={local.phone} onChange={e => updateLocal({ phone: e.target.value })} onBlur={saveField} placeholder="+1 (555) 123-4567" />
         </Field>
       </FieldRow>
 
       <h3 style={{ fontSize: '16px', marginTop: '16px', marginBottom: '16px' }}>Location</h3>
-      
+
       <FieldRow>
         <Field label="Street Address">
-          <input className="input" value={info.address?.street || ''} onChange={e => updateAddress({ street: e.target.value })} placeholder="123 Main St, Apt 4B" />
+          <input className="input" value={local.address?.street || ''} onChange={e => updateAddress({ street: e.target.value })} onBlur={saveField} placeholder="123 Main St, Apt 4B" />
         </Field>
       </FieldRow>
 
       <FieldRow>
         <Field label="City">
-          <input className="input" value={info.address?.city || ''} onChange={e => updateAddress({ city: e.target.value })} placeholder="San Francisco" />
+          <input className="input" value={local.address?.city || ''} onChange={e => updateAddress({ city: e.target.value })} onBlur={saveField} placeholder="San Francisco" />
         </Field>
         <Field label="State / Province">
-          <input className="input" value={info.address?.state || ''} onChange={e => updateAddress({ state: e.target.value })} placeholder="CA" />
+          <input className="input" value={local.address?.state || ''} onChange={e => updateAddress({ state: e.target.value })} onBlur={saveField} placeholder="CA" />
         </Field>
       </FieldRow>
 
       <FieldRow>
         <Field label="Zip / Postal Code">
-          <input className="input" value={info.address?.zipCode || ''} onChange={e => updateAddress({ zipCode: e.target.value })} placeholder="94105" />
+          <input className="input" value={local.address?.zipCode || ''} onChange={e => updateAddress({ zipCode: e.target.value })} onBlur={saveField} placeholder="94105" />
         </Field>
         <Field label="Country">
-          <input className="input" value={info.address?.country || ''} onChange={e => updateAddress({ country: e.target.value })} placeholder="United States" />
+          <input className="input" value={local.address?.country || ''} onChange={e => updateAddress({ country: e.target.value })} onBlur={saveField} placeholder="United States" />
         </Field>
       </FieldRow>
-      
+
       <h3 style={{ fontSize: '16px', marginTop: '16px', marginBottom: '16px' }}>Additional Details</h3>
-      
+
       <FieldRow>
         <Field label="Nationality">
-          <input className="input" value={info.nationality || ''} onChange={e => updateInfo({ nationality: e.target.value })} placeholder="e.g. US Citizen" />
+          <input className="input" value={local.nationality || ''} onChange={e => updateLocal({ nationality: e.target.value })} onBlur={saveField} placeholder="e.g. US Citizen" />
         </Field>
         <Field label="Pronouns">
-          <input className="input" value={info.pronouns || ''} onChange={e => updateInfo({ pronouns: e.target.value })} placeholder="e.g. she/her" />
+          <input className="input" value={local.pronouns || ''} onChange={e => updateLocal({ pronouns: e.target.value })} onBlur={saveField} placeholder="e.g. she/her" />
         </Field>
       </FieldRow>
     </div>
@@ -367,43 +380,48 @@ function PersonalInfoTab({ profile, onSave }: { profile: CandidateProfile, onSav
 function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, onSave: (p: CandidateProfile) => void }) {
   const prefs = profile.workPreferences;
 
-  const updatePrefs = (updates: Partial<typeof prefs>) => {
-    onSave({ ...profile, workPreferences: { ...prefs, ...updates } });
+  // ponytail: Debounce saves — 500ms after last change
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const debouncedSave = (updates: Partial<typeof prefs>) => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      onSave({ ...profile, workPreferences: { ...prefs, ...updates } });
+    }, 500);
   };
 
   const handleArrayInput = (key: 'desiredTitles' | 'desiredLocations', value: string) => {
     const arr = value.split(',').map(s => s.trim()).filter(Boolean);
-    updatePrefs({ [key]: arr });
+    debouncedSave({ [key]: arr });
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      
+
       <FieldRow>
         <Field label="Desired Job Titles (comma-separated)">
-          <input 
-            className="input" 
-            value={prefs.desiredTitles.join(', ')} 
-            onChange={e => handleArrayInput('desiredTitles', e.target.value)} 
-            placeholder="Software Engineer, Frontend Developer, Full Stack..." 
+          <input
+            className="input"
+            defaultValue={prefs.desiredTitles.join(', ')}
+            onBlur={e => handleArrayInput('desiredTitles', e.target.value)}
+            placeholder="Software Engineer, Frontend Developer, Full Stack..."
           />
         </Field>
       </FieldRow>
 
       <FieldRow>
         <Field label="Desired Locations (comma-separated)">
-          <input 
-            className="input" 
-            value={prefs.desiredLocations.join(', ')} 
-            onChange={e => handleArrayInput('desiredLocations', e.target.value)} 
-            placeholder="San Francisco, New York, Remote..." 
+          <input
+            className="input"
+            defaultValue={prefs.desiredLocations.join(', ')}
+            onBlur={e => handleArrayInput('desiredLocations', e.target.value)}
+            placeholder="San Francisco, New York, Remote..."
           />
         </Field>
       </FieldRow>
 
       <FieldRow>
         <Field label="Remote Preference">
-          <select className="input" value={prefs.remotePreference} onChange={e => updatePrefs({ remotePreference: e.target.value as any })}>
+          <select className="input" value={prefs.remotePreference} onChange={e => debouncedSave({ remotePreference: e.target.value as any })}>
             <option value="any">Any (Remote, Hybrid, Onsite)</option>
             <option value="remote">Fully Remote Only</option>
             <option value="hybrid">Hybrid Only</option>
@@ -411,7 +429,7 @@ function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, on
           </select>
         </Field>
         <Field label="Willing to Relocate">
-          <select className="input" value={prefs.willingToRelocate ? 'yes' : 'no'} onChange={e => updatePrefs({ willingToRelocate: e.target.value === 'yes' })}>
+          <select className="input" value={prefs.willingToRelocate ? 'yes' : 'no'} onChange={e => debouncedSave({ willingToRelocate: e.target.value === 'yes' })}>
             <option value="no">No</option>
             <option value="yes">Yes</option>
           </select>
@@ -427,13 +445,13 @@ function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, on
               className="input" 
               type="number" 
               value={prefs.salaryExpectation?.min || 0} 
-              onChange={e => updatePrefs({ salaryExpectation: { ...prefs.salaryExpectation, min: Number(e.target.value) } })} 
+              onChange={e => debouncedSave({ salaryExpectation: { ...prefs.salaryExpectation, min: Number(e.target.value) } })} 
               style={{ width: '120px' }}
             />
             <select 
               className="input" 
               value={prefs.salaryExpectation?.currency || 'USD'} 
-              onChange={e => updatePrefs({ salaryExpectation: { ...prefs.salaryExpectation, currency: e.target.value } })}
+              onChange={e => debouncedSave({ salaryExpectation: { ...prefs.salaryExpectation, currency: e.target.value } })}
               style={{ width: '80px' }}
             >
               <option value="USD">USD</option>
@@ -444,7 +462,7 @@ function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, on
             <select 
               className="input" 
               value={prefs.salaryExpectation?.period || 'annual'} 
-              onChange={e => updatePrefs({ salaryExpectation: { ...prefs.salaryExpectation, period: e.target.value as any } })}
+              onChange={e => debouncedSave({ salaryExpectation: { ...prefs.salaryExpectation, period: e.target.value as any } })}
               style={{ flex: 1 }}
             >
               <option value="annual">Per Year</option>
@@ -456,16 +474,16 @@ function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, on
 
       <FieldRow>
         <Field label="Notice Period">
-          <input className="input" value={prefs.noticePeriod || ''} onChange={e => updatePrefs({ noticePeriod: e.target.value })} placeholder="e.g. 2 weeks, Immediately" />
+          <input className="input" value={prefs.noticePeriod || ''} onChange={e => debouncedSave({ noticePeriod: e.target.value })} placeholder="e.g. 2 weeks, Immediately" />
         </Field>
         <Field label="Work Authorization">
-          <input className="input" value={prefs.workAuthorization || ''} onChange={e => updatePrefs({ workAuthorization: e.target.value })} placeholder="e.g. US Citizen, H1B" />
+          <input className="input" value={prefs.workAuthorization || ''} onChange={e => debouncedSave({ workAuthorization: e.target.value })} placeholder="e.g. US Citizen, H1B" />
         </Field>
       </FieldRow>
 
       <FieldRow>
         <Field label="Requires Visa Sponsorship">
-          <select className="input" value={prefs.requiresVisaSponsorship ? 'yes' : 'no'} onChange={e => updatePrefs({ requiresVisaSponsorship: e.target.value === 'yes' })}>
+          <select className="input" value={prefs.requiresVisaSponsorship ? 'yes' : 'no'} onChange={e => debouncedSave({ requiresVisaSponsorship: e.target.value === 'yes' })}>
             <option value="no">No</option>
             <option value="yes">Yes</option>
           </select>
@@ -474,13 +492,13 @@ function WorkPreferencesTab({ profile, onSave }: { profile: CandidateProfile, on
 
       <FieldRow>
         <Field label="Open to Contract Roles">
-          <select className="input" value={prefs.openToContract ? 'yes' : 'no'} onChange={e => updatePrefs({ openToContract: e.target.value === 'yes' })}>
+          <select className="input" value={prefs.openToContract ? 'yes' : 'no'} onChange={e => debouncedSave({ openToContract: e.target.value === 'yes' })}>
             <option value="no">No</option>
             <option value="yes">Yes</option>
           </select>
         </Field>
         <Field label="Open to Part-time Roles">
-          <select className="input" value={prefs.openToPartTime ? 'yes' : 'no'} onChange={e => updatePrefs({ openToPartTime: e.target.value === 'yes' })}>
+          <select className="input" value={prefs.openToPartTime ? 'yes' : 'no'} onChange={e => debouncedSave({ openToPartTime: e.target.value === 'yes' })}>
             <option value="no">No</option>
             <option value="yes">Yes</option>
           </select>

@@ -14,6 +14,7 @@ import { LeverAdapter } from './adapters/lever';
 import { WorkdayAdapter } from './adapters/workday';
 import { IndeedAdapter } from './adapters/indeed';
 import { AshbyAdapter } from './adapters/ashby';
+import { BambooHRAdapter } from './adapters/bamboohr';
 import { UniversalAdapter } from './adapters/universal';
 
 const ADAPTERS = [
@@ -23,6 +24,7 @@ const ADAPTERS = [
   new WorkdayAdapter(),
   new IndeedAdapter(),
   new AshbyAdapter(),
+  new BambooHRAdapter(),
 ];
 
 export class ATSDetector {
@@ -59,6 +61,14 @@ export class ATSDetector {
 
     const isApplicationPage = detectionResult.pageType === 'application_form';
     const isJobListingPage = detectionResult.pageType === 'job_listing';
+
+    // ponytail: Only upgrade from 'unknown' to 'application_form' — never upgrade 'job_listing'
+    // LinkedIn search pages have filter inputs that would false-positive as application forms
+    const hasFormElements = doc.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea').length > 0;
+    const upgradedToForm = hasFormElements && !isApplicationPage && !isJobListingPage;
+
+    const effectiveIsApplicationPage = isApplicationPage || upgradedToForm;
+    const effectiveIsJobListingPage = isJobListingPage && !upgradedToForm;
     
     // Some pages are both (e.g. LinkedIn split view). We check the URL directly as a fallback.
     const isSearchPage = detectionResult.pageType === 'search_results' || 
@@ -69,7 +79,7 @@ export class ATSDetector {
     let formFields: FormField[] = [];
     let questions: ApplicationQuestion[] = [];
 
-    if (isJobListingPage || isApplicationPage) {
+    if (effectiveIsJobListingPage || effectiveIsApplicationPage) {
       try {
         jobDescription = await activeAdapter.parseJobDescription(doc);
       } catch (e) {
@@ -77,7 +87,7 @@ export class ATSDetector {
       }
     }
 
-    if (isApplicationPage) {
+    if (effectiveIsApplicationPage) {
       try {
         [formFields, questions] = await Promise.all([
           activeAdapter.parseFormFields(doc),
@@ -95,8 +105,8 @@ export class ATSDetector {
       jobDescription,
       formFields,
       questions,
-      isApplicationPage,
-      isJobListingPage,
+      isApplicationPage: effectiveIsApplicationPage,
+      isJobListingPage: effectiveIsJobListingPage,
       isSearchPage,
     };
   }
