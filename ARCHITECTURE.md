@@ -191,27 +191,27 @@ The RAG system gives the AI context from your resume and past application answer
 flowchart TB
     subgraph Ingest ["Ingest Pipeline"]
         A[Raw Text] --> B[Chunker]
-        B --> C[Text Chunks<br/>~600 chars each]
-        C --> D[Ollama Embed<br/>nomic-embed-text]
+        B --> C[Text Chunks ~600 chars]
+        C --> D[Ollama Embed nomic-embed-text]
         D --> E[768-dim Vectors]
-        E --> F[(IndexedDB<br/>memory + embeddings)]
-        E --> G[HNSW Index<br/>in-memory]
+        E --> F[(IndexedDB memory + embeddings)]
+        E --> G[HNSW Index in-memory]
     end
 
     subgraph Query ["Query Pipeline"]
         H[User Question] --> I[Embed Query]
-        I --> J[HNSW Search<br/>O(log n)]
+        I --> J[HNSW Search O log n]
         J --> K[Top-K Vectors]
-        K --> L[Fetch Memory Entries<br/>from IndexedDB]
+        K --> L[Fetch Memory Entries from IndexedDB]
         L --> M[AnswerContext]
     end
 
     subgraph Generate ["AI Generation"]
-        M --> N[Ollama generate<br/>with context]
+        M --> N[Ollama generate with context]
         N --> O[Personalized Answer]
     end
 
-    G -.->|loaded from| F
+    G -.-> F
 ```
 
 ### 5.2 Chunking Strategy
@@ -219,17 +219,17 @@ flowchart TB
 ```mermaid
 flowchart TD
     A[Input Text] --> B{Has paragraph breaks?}
-    B -->|Yes| C[Split on \\n\\n]
-    B -->|No| D[Sliding window<br/>512 chars, 64 overlap]
+    B -->|Yes| C[Split on newlines]
+    B -->|No| D[Sliding window - 512 chars, 64 overlap]
 
-    C --> E[Build chunks<br/>target 512 chars]
-    E --> F{Chunk <br/> minChunkSize?}
+    C --> E[Build chunks - target 512 chars]
+    E --> F{Chunk smaller than minChunkSize?}
     F -->|Yes| G[Skip]
     F -->|No| H[Keep chunk]
 
     D --> H
 
-    H --> I[Output: TextChunk[]<br/>id, text, startChar, endChar, metadata]
+    H --> I[Output: TextChunk with id, text, offsets, metadata]
 ```
 
 **Resume-specific chunking** (`chunkResume`): First splits on section headers (Experience, Education, Skills, etc.), then applies paragraph-aware chunking within each section. This preserves semantic boundaries.
@@ -270,18 +270,15 @@ HNSW (Hierarchical Navigable Small World) builds a multi-layer graph where:
 
 ```mermaid
 flowchart TD
-    subgraph HNSW ["HNSW Graph (simplified)"]
+    Q[Query Vector] --> L3
+
+    subgraph HNSW ["HNSW Graph"]
         L3[Level 3: Entry Point]
         L2[Level 2: 4 nodes]
         L1[Level 1: 8 nodes]
         L0[Level 0: All nodes]
-
-        L3 --> L2
-        L2 --> L1
-        L1 --> L0
     end
 
-    Q[Query Vector] --> L3
     L3 -->|greedy search| L2
     L2 -->|greedy search| L1
     L1 -->|beam search ef=50| L0
@@ -301,17 +298,17 @@ flowchart TD
 erDiagram
     MemoryEntry {
         string id PK
-        string type "resume | application_answer | job_description | ..."
-        string content "the actual text"
-        object metadata "source, createdAt, tags, jobId, ..."
+        string type
+        string content
+        object metadata
     }
 
     EmbeddingRecord {
         string id PK
         string memoryEntryId FK
-        number[] vector "768 floats"
-        string model "nomic-embed-text"
-        number dimensions "768"
+        string vector "768 floats as JSON"
+        string model
+        int dimensions
         string createdAt
     }
 
@@ -369,37 +366,32 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> ExtractingJobs: start(tabId, portal)
+    Idle --> ExtractingJobs: start
 
-    ExtractingJobs --> ProcessingLinkedIn: portal=linkedin
-    ExtractingJobs --> ProcessingURL: portal=naukri|universal
+    ExtractingJobs --> ClickingCard: LinkedIn
+    ExtractingJobs --> Navigating: URL-based
 
-    state ProcessingLinkedIn {
-        [*] --> ClickingCard
-        ClickingCard --> WaitingForLoad: card clicked
-        WaitingForLoad --> ClickingEasyApply: panel loaded
-        ClickingEasyApply --> FillingModal: Easy Apply found
-        ClickingEasyApply --> ClickingExternalApply: no Easy Apply
-        ClickingExternalApply --> WaitingForExternal: Apply clicked
-        FillingModal --> ClickingNext: fields filled
-        ClickingNext --> FillingModal: next step
-        FillingModal --> Submitting: last step
-        Submitting --> ClosingModal: submitted
-        ClosingModal --> ClickingCard: next job
-    }
+    ClickingCard --> WaitingForLoad: card clicked
+    WaitingForLoad --> ClickingEasyApply: panel loaded
+    ClickingEasyApply --> FillingModal: Easy Apply found
+    ClickingEasyApply --> ClickingExternalApply: no Easy Apply
+    ClickingExternalApply --> ExternalFormFill: Apply clicked
+    FillingModal --> ClickingNext: fields filled
+    ClickingNext --> FillingModal: next step
+    FillingModal --> Submitting: last step
+    Submitting --> ClosingModal: submitted
+    ClosingModal --> ClickingCard: next job
+    ClosingModal --> [*]: all done
 
-    state ProcessingURL {
-        [*] --> Navigating
-        Navigating --> WaitingForPage: URL loaded
-        WaitingForPage --> ClickingApply: job listing
-        ClickingApply --> WaitingForForm: Apply clicked
-        WaitingForForm --> FillingForm: form detected
-        FillingForm --> SubmittingURL: fields filled
-        SubmittingURL --> Navigating: next URL
-    }
+    ExternalFormFill --> ClickingCard: next job
 
-    ClosingModal --> [*]: all jobs done
-    SubmittingURL --> [*]: all jobs done
+    Navigating --> WaitingForPage: URL loaded
+    WaitingForPage --> ClickingApply: job listing
+    ClickingApply --> WaitingForForm: Apply clicked
+    WaitingForForm --> FillingForm: form detected
+    FillingForm --> SubmittingURL: fields filled
+    SubmittingURL --> Navigating: next URL
+    SubmittingURL --> [*]: all done
 ```
 
 ### 6.2 LinkedIn Auto-Apply Flow
@@ -459,7 +451,6 @@ erDiagram
         string name
         object personalInfo
         object workPreferences
-        array resumes
     }
 
     resumes {
@@ -467,7 +458,6 @@ erDiagram
         string profileId FK
         string rawText
         object parsed
-        blob fileData
     }
 
     jobs {
@@ -493,7 +483,7 @@ erDiagram
     embeddings {
         string id PK
         string memoryEntryId FK
-        number[] vector
+        string vector
         string model
     }
 
